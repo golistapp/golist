@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Checkout - Ramazone</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; padding-bottom: 100px; -webkit-tap-highlight-color: transparent; }
+        
+        .step-container { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .hidden-step { display: none; opacity: 0; }
+        
+        /* Cards */
+        .slab-card, .budget-card, .time-chip, .addr-card { 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; 
+        }
+        
+        /* Selection States */
+        .slab-card.selected { border-color: #2563eb; background-color: #eff6ff; box-shadow: 0 4px 10px rgba(37, 99, 235, 0.1); }
+        .budget-card.selected { border-color: #f59e0b; background-color: #fffbeb; transform: translateY(-2px); }
+        .time-chip.selected { background-color: #1e293b; color: white; border-color: #1e293b; }
+        .addr-card.selected { border-color: #22c55e; background-color: #f0fdf4; box-shadow: 0 2px 5px rgba(34, 197, 94, 0.1); }
+        
+        /* Disabled State */
+        .slab-card.disabled { opacity: 0.5; pointer-events: none; filter: grayscale(1); background-color: #f1f5f9; }
+
+        .qty-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: bold; transition: active 0.1s; }
+        .qty-btn:active { transform: scale(0.9); }
+
+        .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        /* Success Animation */
+        .success-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.98); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+        .success-overlay.active { opacity: 1; pointer-events: auto; }
+        .checkmark-circle { width: 80px; height: 80px; border-radius: 50%; background: #22c55e; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 rgba(34, 197, 94, 0.4); animation: pulse-green 2s infinite; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(34, 197, 94, 0); } 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } }
+    </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+    <!-- HEADER -->
+    <div class="bg-white sticky top-0 z-20 px-4 py-3 flex items-center gap-4 shadow-sm border-b border-slate-100">
+        <button onclick="handleBack()" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-600 hover:bg-slate-100 transition">
+            <i class="fa-solid fa-arrow-left"></i>
+        </button>
+        <div>
+            <h1 class="text-lg font-extrabold text-slate-900 leading-none" id="pageTitle">My Cart</h1>
+            <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5" id="pageSub">Review Items</p>
+        </div>
+    </div>
+
+    <div class="p-4 max-w-md mx-auto space-y-5">
+
+        <!-- STEP 1: CART ITEMS -->
+        <div id="step1_cart" class="step-container space-y-4">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+                    <h2 class="text-xs font-bold text-slate-600 uppercase tracking-wide">Added Products</h2>
+                    <span class="text-[10px] font-bold bg-white text-slate-400 px-2 py-1 rounded border border-slate-200" id="itemCountBadge">0 Items</span>
+                </div>
+                
+                <div id="cartList" class="divide-y divide-slate-50"></div>
+
+                <div id="cartEmptyState" class="py-12 text-center hidden">
+                    <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <i class="fa-solid fa-cart-shopping text-slate-300 text-2xl"></i>
+                    </div>
+                    <p class="text-slate-500 text-sm font-bold">Your cart is empty!</p>
+                    <button onclick="window.location.href='home.html'" class="mt-4 text-xs font-bold text-white bg-slate-900 px-6 py-3 rounded-full shadow-lg">START SHOPPING</button>
+                </div>
+            </div>
+            
+            <div id="addMoreLink" class="text-center">
+                <button onclick="window.location.href='home.html'" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center justify-center gap-1 mx-auto py-2">
+                    <i class="fa-solid fa-plus"></i> Add more items
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: DELIVERY DETAILS -->
+        <div id="step2_details" class="step-container hidden-step space-y-4">
+            
+            <!-- A. Location Manager -->
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="text-xs font-bold text-slate-600 uppercase flex items-center gap-2">
+                        <i class="fa-solid fa-map-pin text-red-500"></i> Delivery Location
+                    </label>
+                    <button onclick="openLocationModal()" class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full hover:bg-indigo-100 transition">CHANGE</button>
+                </div>
+                <div id="selectedAddressCard" class="bg-slate-50 rounded-xl p-3 border border-slate-200 flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-slate-400 border border-slate-100 shrink-0">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-sm text-slate-800" id="dispAddrTitle">Detecting Location...</h4>
+                        <p class="text-xs text-slate-500 leading-snug mt-0.5 line-clamp-2" id="dispAddrText">Please wait, finding GPS...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- B. Delivery Charges (Renamed from Parcel Size) -->
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xs font-bold text-slate-600 uppercase"><i class="fa-solid fa-truck-fast text-blue-500 mr-1"></i> Delivery Charges</h3>
+                    <div id="weightBadge" class="hidden bg-slate-900 text-white px-2 py-0.5 rounded text-[10px] font-bold">
+                        <i class="fa-solid fa-scale-balanced mr-1"></i><span id="totalWeightDisplay">0 KG</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="manualSelectRate(50)" id="rateBtn50" class="slab-card bg-slate-50 rounded-xl p-3 text-left relative overflow-hidden group">
+                        <div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100"><i class="fa-solid fa-circle-check text-blue-600"></i></div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Small</p>
+                        <p class="text-xl font-extrabold text-slate-800">₹50</p>
+                        <p class="text-[10px] text-slate-500 mt-1">0-10 KG</p>
+                    </button>
+                    <button onclick="manualSelectRate(70)" id="rateBtn70" class="slab-card bg-slate-50 rounded-xl p-3 text-left relative overflow-hidden group">
+                        <div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100"><i class="fa-solid fa-circle-check text-blue-600"></i></div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Medium</p>
+                        <p class="text-xl font-extrabold text-slate-800">₹70</p>
+                        <p class="text-[10px] text-slate-500 mt-1">11-20 KG</p>
+                    </button>
+                    <button onclick="manualSelectRate(80)" id="rateBtn80" class="slab-card bg-slate-50 rounded-xl p-3 text-left relative overflow-hidden group">
+                        <div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100"><i class="fa-solid fa-circle-check text-blue-600"></i></div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Large</p>
+                        <p class="text-xl font-extrabold text-slate-800">₹80</p>
+                        <p class="text-[10px] text-slate-500 mt-1">21-30 KG</p>
+                    </button>
+                    <button onclick="manualSelectRate(100)" id="rateBtn100" class="slab-card bg-slate-50 rounded-xl p-3 text-left relative overflow-hidden group">
+                        <div class="absolute top-2 right-2 opacity-0 group-[.selected]:opacity-100"><i class="fa-solid fa-circle-check text-blue-600"></i></div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Heavy</p>
+                        <p class="text-xl font-extrabold text-slate-800">₹100</p>
+                        <p class="text-[10px] text-slate-500 mt-1">31-50 KG</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- C. Budget & Quality (Updated Titles) -->
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-600 uppercase mb-3">Budget & Quality</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="selectBudget('high')" id="bud_high" class="budget-card bg-slate-50 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center h-24">
+                        <i class="fa-solid fa-star text-amber-400 text-sm"></i>
+                        <div class="leading-tight">
+                            <span class="text-[10px] font-bold text-slate-700 block">Best Product Quality</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase">High Price</span>
+                        </div>
+                    </button>
+                    <button onclick="selectBudget('standard')" id="bud_standard" class="budget-card selected bg-white border-amber-500 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center h-24 shadow-sm">
+                        <i class="fa-solid fa-shop text-blue-500 text-sm"></i>
+                        <div class="leading-tight">
+                            <span class="text-[10px] font-bold text-slate-700 block">Market Std. Product</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase">Normal Price</span>
+                        </div>
+                    </button>
+                    <button onclick="selectBudget('custom')" id="bud_custom" class="budget-card bg-slate-50 rounded-xl p-2.5 flex flex-col items-center justify-center gap-1 text-center h-24">
+                        <i class="fa-solid fa-indian-rupee-sign text-green-600 text-sm"></i>
+                        <div class="leading-tight">
+                            <span class="text-[10px] font-bold text-slate-700 block">Your Product Budget</span>
+                            <span class="text-[8px] font-bold text-slate-400 uppercase">Enter Amount</span>
+                        </div>
+                    </button>
+                </div>
+                <div id="customBudgetInput" class="hidden mt-3 animate-[fadeIn_0.3s]">
+                    <input type="number" id="customAmount" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold focus:ring-2 focus:ring-green-500 focus:outline-none" placeholder="Enter Max Amount (₹)">
+                </div>
+            </div>
+
+            <!-- D. Prepare Timing (Updated with Manual Input) -->
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-slate-600 uppercase">Prepare Timing</h3>
+                    <span class="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded" id="timeDisplay">Standard</span>
+                </div>
+                
+                <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200 mb-3">
+                     <div class="w-10 h-10 rounded-lg bg-white flex items-center justify-center text-slate-500 shadow-sm border border-slate-100">
+                         <i class="fa-regular fa-clock"></i>
+                     </div>
+                     <div class="flex-1">
+                         <input type="time" id="manualTimeInput" class="w-full bg-transparent text-sm font-bold text-slate-800 focus:outline-none" onchange="selectManualTime(this.value)">
+                         <p class="text-[10px] text-slate-400">Tap to select exact time</p>
+                     </div>
+                </div>
+
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <button onclick="selectTime('Evening')" id="time_Evening" class="time-chip selected shrink-0 px-4 py-2 rounded-full border border-slate-200 text-xs font-bold bg-slate-50 text-slate-600">Evening</button>
+                    <button onclick="selectTime('Afternoon')" id="time_Afternoon" class="time-chip shrink-0 px-4 py-2 rounded-full border border-slate-200 text-xs font-bold bg-slate-50 text-slate-600">Afternoon</button>
+                    <button onclick="selectTime('Next Morning')" id="time_Next Morning" class="time-chip shrink-0 px-4 py-2 rounded-full border border-slate-200 text-xs font-bold bg-slate-50 text-slate-600">Next Morning</button>
+                </div>
+            </div>
+
+            <!-- E. Magic Box (New) -->
+            <div class="bg-white rounded-2xl shadow-sm p-4 border border-slate-200">
+                <h3 class="text-xs font-bold text-slate-600 uppercase mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Magic Box <span class="text-[9px] text-slate-400 font-normal normal-case">(Delivery Note / Special Request)</span>
+                </h3>
+                <textarea id="magicBoxInput" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 h-20 resize-none" placeholder="Koi special request? Yahan likhein..."></textarea>
+            </div>
+
+        </div> 
+    </div>
+
+    <!-- BOTTOM BAR -->
+    <div id="bottomBar" class="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 p-4 pb-6 shadow-[0_-5px_25px_rgba(0,0,0,0.05)] z-40 rounded-t-2xl">
+        <div class="max-w-md mx-auto flex items-center gap-3">
+            
+            <!-- Back Button -->
+            <button onclick="handleBack()" class="h-14 w-16 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center transition active:scale-95">
+                <i class="fa-solid fa-arrow-left text-lg"></i>
+            </button>
+            
+            <!-- Action Button -->
+            <div class="flex-1">
+                <!-- Step 1 -->
+                <button onclick="goToDetails()" id="btnStep1" class="w-full bg-slate-900 hover:bg-black text-white font-bold h-14 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-between px-6">
+                    <div class="text-left leading-none">
+                        <span class="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-1">TOTAL</span>
+                        <span class="text-xl font-extrabold">₹<span id="cartTotal">0</span></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span>CONTINUE</span>
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </div>
+                </button>
+
+                <!-- Step 2 -->
+                <button onclick="placeOrder()" id="btnStep2" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold h-14 rounded-xl shadow-lg active:scale-95 transition flex items-center justify-between px-6 hidden disabled:opacity-50 disabled:grayscale">
+                    <div class="text-left leading-none">
+                        <span class="text-[9px] text-green-200 font-bold uppercase tracking-wider block mb-1">PAYABLE</span>
+                        <span class="text-xl font-extrabold">₹<span id="finalTotal">0</span></span>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span>PLACE ORDER</span>
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- LOCATION MODAL -->
+    <div id="locationModal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center modal-overlay p-0 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl animate-[slideUp_0.3s_ease-out]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-lg">Select Address</h3>
+                <button onclick="closeLocationModal()" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3 max-h-[60vh] overflow-y-auto mb-4" id="addressList"></div>
+            <button onclick="addNewLocation()" id="btnAddLocation" class="w-full py-3 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-indigo-100 transition active:scale-95">
+                <i class="fa-solid fa-location-crosshairs"></i> Add New Location
+            </button>
+            <div id="addAddrForm" class="hidden space-y-3 pt-2">
+                <div class="bg-indigo-50 p-3 rounded-lg border border-indigo-100 text-xs text-indigo-700 flex items-center gap-2">
+                    <i class="fa-solid fa-check-circle"></i> <span id="detectedCoords">GPS Detected</span>
+                </div>
+                <div><label class="text-[10px] font-bold text-slate-500 uppercase">Save As (Title)</label><input type="text" id="newAddrTitle" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-bold mt-1" placeholder="e.g. Home, Office"></div>
+                <div><label class="text-[10px] font-bold text-slate-500 uppercase">Address Details</label><textarea id="newAddrText" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium mt-1 resize-none h-16" placeholder="Street, Landmark..."></textarea></div>
+                <div class="flex gap-2">
+                    <button onclick="cancelAddAddr()" class="flex-1 py-3 text-slate-500 font-bold text-xs bg-slate-100 rounded-lg">CANCEL</button>
+                    <button onclick="saveNewAddress()" class="flex-1 py-3 text-white font-bold text-xs bg-slate-900 rounded-lg">SAVE LOCATION</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SUCCESS OVERLAY -->
+    <div id="successOverlay" class="success-overlay">
+        <div class="checkmark-circle mb-6"><i class="fa-solid fa-check text-4xl text-white"></i></div>
+        <h2 class="text-2xl font-bold text-slate-900 mb-2">Order Placed!</h2>
+        <p class="text-slate-500 text-sm mb-8">Redirecting to live tracking...</p>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-xl z-[110] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex gap-2 items-center">
+        <i class="fa-solid fa-circle-info text-yellow-400"></i><span id="toastMsg">Alert</span>
+    </div>
+
+    <script src="cart.js"></script>
+</body>
+</html>

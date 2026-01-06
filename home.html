@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Digital Store</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        
+        /* Sidebar & Overlay */
+        .sidebar { transform: translateX(-100%); transition: transform 0.3s ease-in-out; }
+        .sidebar.open { transform: translateX(0); }
+        .overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .overlay.open { opacity: 1; pointer-events: auto; }
+        
+        /* Floating Buttons */
+        .cart-float { background: linear-gradient(135deg, #2563eb, #1d4ed8); box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.5); }
+        .add-float { background: #0f172a; box-shadow: 0 4px 15px rgba(15, 23, 42, 0.4); }
+
+        /* Custom Checkbox */
+        .custom-check { width: 22px; height: 22px; accent-color: #ef4444; transform: scale(1.1); }
+        
+        /* --- SLIDER CSS (16:4 Ratio) --- */
+        .slider-container {
+            width: 100%;
+            aspect-ratio: 16/4;
+            overflow: hidden;
+            position: relative;
+            background: #e2e8f0;
+        }
+        
+        .slider-wrapper {
+            display: flex;
+            height: 100%;
+        }
+        
+        .slide {
+            height: 100%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            background-size: cover;
+            background-position: center;
+        }
+
+        /* Dot Indicators */
+        .slider-dot {
+            width: 6px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 50%; transition: all 0.3s;
+        }
+        .slider-dot.active { width: 18px; background: white; border-radius: 10px; }
+
+        /* Stats Card Style */
+        .stat-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 8px 4px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            height: 80px; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .repeat-btn {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .repeat-btn:active { transform: scale(0.95); background: #dcfce7; }
+
+        /* Hide Scrollbar */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* --- CHAT-STYLE SEARCH UI LOGIC --- */
+        body.search-mode .hide-on-search { display: none !important; }
+        body.search-mode { overflow: hidden; background-color: #f8fafc; }
+        body.search-mode #searchContainer { position: fixed; bottom: 0; left: 0; right: 0; top: auto; z-index: 60; background: white; padding: 10px 16px; box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1); border-top: 1px solid #e2e8f0; border-bottom: none; margin: 0; width: 100%; height: auto; }
+        body.search-mode #productList { position: fixed; top: 0; left: 0; right: 0; bottom: 70px; z-index: 50; display: flex; flex-direction: column; justify-content: flex-end; overflow-y: auto; padding: 16px; padding-bottom: 10px; background-color: #f8fafc; min-height: 0; }
+        body.search-mode #productList li { border-radius: 12px; margin-bottom: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; background: white; animation: popIn 0.2s ease-out; }
+        @keyframes popIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        body.search-mode #searchInput { background-color: #f1f5f9; border-color: #cbd5e1; }
+
+        input[type="color"] { -webkit-appearance: none; border: none; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; padding: 0; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #invoiceModal, #invoiceModal * { visibility: visible; }
+            #invoiceModal { position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: white; z-index: 9999; }
+            .no-print { display: none !important; }
+        }
+
+        /* Timeline in Modal */
+        .modal-timeline-item { position: relative; padding-left: 24px; padding-bottom: 20px; border-left: 2px solid #e2e8f0; }
+        .modal-timeline-item:last-child { border-left: 2px solid transparent; padding-bottom: 0; }
+        .modal-timeline-dot { position: absolute; left: -7px; top: 0; width: 12px; height: 12px; border-radius: 50%; background: #e2e8f0; border: 2px solid #fff; }
+        .modal-timeline-item.active .modal-timeline-dot { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2); }
+        .modal-timeline-item.active { border-left-color: #22c55e; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased pb-32">
+
+    <header id="mainHeader" class="hide-on-search bg-white sticky top-0 z-30 shadow-sm border-b border-slate-100 px-4 h-16 flex items-center justify-center relative">
+        <button onclick="toggleMenu()" class="absolute left-4 w-10 h-10 flex items-center justify-center text-slate-500 hover:text-slate-900 transition active:scale-95">
+            <i class="fa-solid fa-bars text-xl"></i>
+        </button>
+        <div class="flex items-center justify-center h-full">
+            <h1 class="text-lg font-extrabold text-slate-900 leading-none truncate max-w-[200px]" id="headerShopName">My Shop</h1>
+        </div>
+        <button onclick="window.location.href='cart.html'" class="absolute right-4 w-10 h-10 flex items-center justify-center text-slate-600 active:scale-95 transition hover:text-blue-600">
+            <i class="fa-solid fa-store text-2xl"></i>
+            <span id="headerBadge" class="absolute top-1 right-0 bg-red-500 w-2.5 h-2.5 rounded-full hidden border border-white"></span>
+        </button>
+    </header>
+
+    <div id="statusBar" class="hide-on-search bg-green-50 border-b border-green-100 py-2 px-4 flex items-center justify-center gap-2 text-center w-full whitespace-nowrap overflow-hidden">
+        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"></span>
+        <p class="text-[11px] text-green-700 font-bold tracking-wide">Your store is live <span class="text-green-500 mx-1">•</span> <span class="font-medium text-green-600">managed by you</span></p>
+    </div>
+
+    <div class="hide-on-search slider-container" id="sliderContainer">
+        <div id="sliderTrack" class="slider-wrapper">
+            <div class="slide bg-slate-200"></div>
+        </div>
+        <div id="dotsContainer" class="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10 pointer-events-none"></div>
+    </div>
+
+    <div id="liveOrderBanner" onclick="openTrackingModal()" class="hidden hide-on-search mx-4 mt-4 bg-white rounded-xl shadow-lg border border-blue-100 p-4 flex items-center justify-between relative overflow-hidden active:scale-95 transition cursor-pointer group">
+        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500"></div>
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition">
+                <div class="relative">
+                    <span class="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-3 w-3 bg-blue-500"></span>
+                    </span>
+                    <i class="fa-solid fa-truck-fast text-blue-600 text-lg"></i>
+                </div>
+            </div>
+            <div>
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Active Order</p>
+                <h3 class="font-bold text-slate-800 text-sm" id="bannerStatus">Processing...</h3>
+            </div>
+        </div>
+        <div class="text-right">
+            <span class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-full group-hover:bg-blue-600 group-hover:text-white transition shadow-sm">Track <i class="fa-solid fa-chevron-right text-[10px] ml-1"></i></span>
+        </div>
+    </div>
+
+    <div id="statsSection" class="hide-on-search px-4 py-3 grid grid-cols-3 gap-2">
+        <div class="stat-card">
+            <p class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">Products</p>
+            <p class="text-lg font-extrabold text-slate-800 leading-none" id="statProductCount">0</p>
+            <p class="text-[9px] text-slate-400 font-medium mt-1 bg-slate-100 px-1.5 rounded">Total Items</p>
+        </div>
+        <div class="stat-card">
+            <p class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">Today</p>
+            <p class="text-lg font-extrabold text-indigo-600 leading-none" id="statOrderCount">0</p>
+            <p class="text-[9px] text-slate-400 font-medium mt-1 bg-indigo-50 text-indigo-400 px-1.5 rounded">New Orders</p>
+        </div>
+        <div class="stat-card repeat-btn" onclick="repeatLastOrder()">
+            <p class="text-[10px] text-green-600 font-bold uppercase mb-0.5">Quick Action</p>
+            <i class="fa-solid fa-clock-rotate-left text-xl text-green-600 mb-1"></i>
+            <p class="text-[9px] text-white font-bold bg-green-600 px-2 py-0.5 rounded-full">REPEAT ORDER</p>
+        </div>
+    </div>
+
+    <div id="menuOverlay" class="overlay fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onclick="toggleMenu()"></div>
+    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[80%] max-w-[300px] bg-white z-50 shadow-2xl flex flex-col">
+        <div class="p-6 bg-slate-900 text-white relative">
+            <div class="w-16 h-16 rounded-full border-2 border-white/20 mb-3 overflow-hidden bg-slate-800">
+                <img id="profileImg" src="https://via.placeholder.com/150" class="w-full h-full object-cover">
+            </div>
+            <h2 class="font-bold text-lg" id="menuName">Guest</h2>
+            <p class="text-xs text-slate-400 font-mono" id="menuMobile">Login to access</p>
+            
+            <label id="logoUploadBtn" class="hidden absolute bottom-4 right-4 bg-white text-slate-900 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer shadow-lg active:scale-90 transition">
+                <i class="fa-solid fa-camera text-xs"></i>
+                <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="uploadCompressedLogo()">
+            </label>
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto" id="sidebarNav"></nav>
+    </div>
+
+    <div class="px-4 pb-10 min-h-[50vh] mt-0.5 relative">
+        
+        <div id="searchContainer" class="search-container flex items-center justify-between px-1 mb-3 border-t border-slate-100 pt-3 gap-3 bg-transparent transition-all duration-300">
+            <div class="flex-1">
+                <div class="relative">
+                    <input type="text" id="searchInput" onfocus="activateSearch()" onblur="deactivateSearch()" onkeyup="filterProducts()" placeholder="Search items..." class="w-full bg-white border border-slate-300 rounded-full py-2 pl-9 pr-8 text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all">
+                    <i class="fa-solid fa-search absolute left-3.5 top-2.5 text-slate-400 text-xs"></i>
+                    
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-2 top-1.5 w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 z-10">
+                        <i class="fa-solid fa-xmark text-[10px]"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div id="headerControls" class="flex bg-white rounded-lg border border-slate-200 p-0.5 shadow-sm h-9 items-center">
+                <button onclick="shareStore()" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:text-green-600 hover:bg-green-50 transition" title="Share Store">
+                    <i class="fa-solid fa-share-nodes text-xs"></i>
+                </button>
+                
+                <div id="ownerControls" class="flex hidden">
+                    <div class="w-[1px] bg-slate-100 my-1 h-6"></div>
+                    <button onclick="toggleEditMode()" id="globalEditBtn" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition">
+                        <i class="fa-solid fa-pencil text-xs"></i>
+                    </button>
+                    <div class="w-[1px] bg-slate-100 my-1 h-6"></div>
+                    <button onclick="toggleDeleteMode()" id="globalDeleteBtn" class="w-8 h-8 flex items-center justify-center rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition">
+                        <i class="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- MAGIC BOX REMOVED AS REQUESTED -->
+
+        <ul id="productList" class="space-y-0.5 mt-2">
+            <div class="text-center py-12">
+                <div class="loader inline-block"></div>
+                <p class="text-xs text-slate-400 mt-2">Loading Products...</p>
+            </div>
+        </ul>
+    </div>
+
+    <div class="text-center py-6 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 border-t border-slate-200">
+        Delivered by Ramazone 🚚
+    </div>
+
+    <div id="bulkDeleteBar" class="hidden fixed bottom-36 left-4 right-4 z-40">
+        <button onclick="deleteSelectedItems()" class="w-full bg-red-600 text-white font-bold py-3.5 rounded-lg shadow-xl flex items-center justify-center gap-2 active:scale-95 transition border-2 border-white">
+            <i class="fa-solid fa-trash-can"></i>
+            <span>Delete Selected Items</span>
+        </button>
+    </div>
+
+    <div class="fixed bottom-6 right-6 z-30 flex flex-col items-end gap-3">
+        <button id="fabAddStock" onclick="openAddModal()" class="hidden add-float w-12 h-12 rounded-full text-white flex items-center justify-center active:scale-90 transition hover:bg-slate-800">
+            <i class="fa-solid fa-plus text-lg"></i>
+        </button>
+
+        <!-- UPDATED CHECKOUT BUTTON -->
+        <button onclick="window.location.href='cart.html'" class="cart-float text-white rounded-full pl-6 pr-8 py-2.5 flex items-center gap-3 active:scale-95 transition-all group shadow-2xl">
+            <div class="relative">
+                <i class="fa-solid fa-receipt text-xl group-hover:rotate-12 transition duration-300"></i>
+                <span id="floatCartBadge" class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center hidden border-2 border-blue-600">0</span>
+            </div>
+            <div class="text-left leading-tight">
+                <span class="block text-[10px] text-blue-200 font-bold uppercase tracking-wider">Checkout</span>
+                <span class="block font-bold text-sm tracking-wide">MAKE BILL</span>
+            </div>
+        </button>
+    </div>
+
+    <div id="trackingModal" class="hidden fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center">
+        <div class="bg-white w-full max-w-md h-[85vh] sm:h-auto rounded-t-2xl sm:rounded-2xl p-0 shadow-2xl flex flex-col overflow-hidden animate-[slideUp_0.3s_ease-out]">
+            <div class="bg-slate-900 p-4 flex justify-between items-center shrink-0">
+                 <div>
+                    <h2 class="text-white font-bold text-lg">Order #<span id="modalOrderId">...</span></h2>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wide">Live Status Update</p>
+                </div>
+                <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center transition active:scale-90"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+    
+            <div class="flex-1 overflow-y-auto p-5 bg-slate-50 space-y-5">
+                 <div class="space-y-0 pl-2 border-l-2 border-slate-200 ml-2 py-2" id="modalTimeline"></div>
+    
+                 <div id="modalPartnerCard" class="hidden bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                     <div class="flex items-center gap-3">
+                         <div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center"><i class="fa-solid fa-motorcycle text-green-600"></i></div>
+                         <div>
+                             <p class="text-[10px] text-slate-400 font-bold uppercase">Delivery Partner</p>
+                             <h4 class="font-bold text-slate-800 text-sm" id="modalPartnerName">Assigning...</h4>
+                         </div>
+                     </div>
+                     <div class="flex gap-2 mt-3">
+                         <a id="btnCallPartner" href="#" class="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg text-xs font-bold text-center border border-slate-200 hover:bg-slate-200"><i class="fa-solid fa-phone mr-1"></i> Call</a>
+                         <a id="btnChatPartner" href="#" class="flex-1 bg-green-50 text-green-600 py-2.5 rounded-lg text-xs font-bold text-center border border-green-100 hover:bg-green-100"><i class="fa-brands fa-whatsapp mr-1 text-sm"></i> Chat</a>
+                     </div>
+                 </div>
+    
+                 <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                     <h3 class="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-100 pb-2 flex justify-between items-center">
+                         <span>Ordered Items</span>
+                         <i class="fa-solid fa-basket-shopping"></i>
+                     </h3>
+                     <div id="modalItemsList" class="space-y-3 text-sm"></div>
+                     <div class="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center bg-slate-50 p-2 rounded-lg">
+                         <span class="font-bold text-slate-600 text-xs uppercase">Total Amount</span>
+                         <span class="font-extrabold text-slate-900 text-lg">₹<span id="modalTotal">0</span></span>
+                     </div>
+                 </div>
+            </div>
+            
+            <div class="p-4 bg-white border-t border-slate-100 shrink-0" id="modalFooterActions">
+                <p class="text-[10px] text-center text-slate-400 mb-3 font-bold uppercase">Having issues?</p>
+                <button onclick="openSupportOptions()" class="w-full py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">CONTACT SUPPORT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="supportModal" class="hidden fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl animate-[slideUp_0.2s_ease-out]">
+            <div class="text-center mb-6">
+                <div class="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 text-green-600">
+                    <i class="fa-brands fa-whatsapp text-2xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-900 text-lg">Contact Support</h3>
+                <p class="text-xs text-slate-500 mt-1">How can we help you today?</p>
+            </div>
+            <div class="space-y-3">
+                <button onclick="sendSupportMsg('Order Related Problem')" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 py-3.5 rounded-xl text-left px-4 text-sm font-bold text-slate-700 flex justify-between items-center group">
+                    <span>📦 Order Related Problem</span>
+                    <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-slate-600"></i>
+                </button>
+                <button onclick="sendSupportMsg('Delivery Boy Related')" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 py-3.5 rounded-xl text-left px-4 text-sm font-bold text-slate-700 flex justify-between items-center group">
+                    <span>🏍️ Delivery Boy Related</span>
+                    <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-slate-600"></i>
+                </button>
+                <button onclick="sendSupportMsg('Other Problem')" class="w-full bg-slate-50 hover:bg-slate-100 border border-slate-200 py-3.5 rounded-xl text-left px-4 text-sm font-bold text-slate-700 flex justify-between items-center group">
+                    <span>💬 Other Problem</span>
+                    <i class="fa-solid fa-chevron-right text-slate-300 group-hover:text-slate-600"></i>
+                </button>
+            </div>
+            <button onclick="document.getElementById('supportModal').classList.add('hidden')" class="w-full mt-6 py-3 text-slate-400 font-bold text-xs uppercase tracking-widest hover:text-slate-600">Cancel</button>
+        </div>
+    </div>
+
+    <!-- MAGIC BOX MODAL REMOVED -->
+
+    <!-- NEW ADD STOCK MODAL (UPDATED) -->
+<!-- REPLACE THE OLD "addStockModal" DIV WITH THIS NEW COMPACT VERSION -->
+<div id="addStockModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full sm:translate-y-0 relative" id="addStockCard">
+        
+        <!-- Close Button -->
+        <button onclick="closeAddModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center z-10">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div class="space-y-4 mt-1">
+            
+            <!-- Suggestion & Name Input (Ultra Compact) -->
+            <div class="relative">
+                <div id="suggestionBox" class="flex flex-wrap gap-2 mb-1 justify-start items-end min-h-[20px] transition-all">
+                    <!-- Suggestions will appear here -->
+                </div>
+                
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Product Name</label>
+                <input type="text" id="inpProdName" autocomplete="off" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all placeholder:text-slate-300" placeholder="Type name...">
+            </div>
+
+            <!-- Quantity Section -->
+            <div>
+                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Set Quantity</label>
+                
+                <!-- Main Control Row (Compact Height, Wide Buttons) -->
+                <div id="qtyControlRow" class="flex items-center gap-2 mb-2 transition-all">
+                    <!-- Wider Buttons (w-24) & Compact Height (h-10) -->
+                    <button onclick="adjustQty(-1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
+                        <i class="fa-solid fa-minus text-lg"></i>
+                    </button>
+                    
+                    <input type="text" id="inpProdQty" class="flex-1 h-10 bg-slate-50 border border-slate-200 rounded-xl px-2 text-center text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="Qty">
+                    
+                    <!-- Wider Buttons (w-24) & Compact Height (h-10) -->
+                    <button onclick="adjustQty(1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
+                        <i class="fa-solid fa-plus text-lg"></i>
+                    </button>
+                </div>
+
+                <!-- Single Line Scrollable Presets -->
+                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                    <button onclick="setQtyPreset('100 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">100 g</button>
+                    <button onclick="setQtyPreset('250 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">250 g</button>
+                    <button onclick="setQtyPreset('500 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">500 g</button>
+                    <button onclick="setQtyPreset('1 kg', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 kg</button>
+                    <button onclick="setQtyPreset('1 Pkt', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pkt</button>
+                    <button onclick="setQtyPreset('1 Pc', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pc</button>
+                    
+                    
+                    <!-- CUSTOM BUTTON -->
+                    <button onclick="toggleCustomQty(this)" class="qty-chip shrink-0 px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold rounded-lg text-xs hover:bg-indigo-600 hover:text-white transition">Custom</button>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <button onclick="saveProduct()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition text-sm tracking-wide">SAVE PRODUCT</button>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="profileMenuModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl animate-[slideUp_0.3s_ease-out]">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-900 text-lg">My Shop Profile</h3>
+                <button onclick="closeModal('profileMenuModal')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-3">
+                <button onclick="document.getElementById('bannerModal').classList.remove('hidden'); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-image text-pink-500 w-6"></i> Banner Settings
+                </button>
+                <button onclick="changeShopName(); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-store text-blue-500 w-6"></i> Change Shop Name
+                </button>
+                <button onclick="openAddressModal(); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-location-dot text-green-500 w-6"></i> Update Address
+                </button>
+                <button onclick="changePin(); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-key text-amber-500 w-6"></i> Change PIN
+                </button>
+                <label class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition cursor-pointer">
+                    <i class="fa-solid fa-camera text-indigo-500 w-6"></i> Change Profile Picture
+                    <input type="file" class="hidden" accept="image/*" onchange="uploadCompressedLogo()">
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="videoHelpModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col max-h-[80vh] animate-[slideUp_0.3s_ease-out]">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h3 class="font-bold text-slate-900 text-lg"><i class="fa-brands fa-youtube text-red-600 mr-2"></i>How to Use</h3>
+                <button onclick="closeModal('videoHelpModal')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 bg-slate-50 space-y-3" id="videoListContainer">
+                <p class="text-center text-slate-400 text-xs py-8">Loading videos...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="policyViewModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-0 shadow-xl overflow-hidden flex flex-col max-h-[80vh] animate-[slideUp_0.3s_ease-out]">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                <h3 class="font-bold text-slate-900 text-lg">Policies & Terms</h3>
+                <button onclick="closeModal('policyViewModal')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-2 bg-slate-50 border-b border-slate-100 overflow-x-auto whitespace-nowrap">
+                <button onclick="loadPolicy('privacy')" class="px-4 py-2 text-xs font-bold bg-white rounded-lg shadow-sm border border-slate-200 mr-2 focus:ring-2 ring-indigo-500">Privacy</button>
+                <button onclick="loadPolicy('terms')" class="px-4 py-2 text-xs font-bold bg-white rounded-lg shadow-sm border border-slate-200 mr-2 focus:ring-2 ring-indigo-500">Terms</button>
+                <button onclick="loadPolicy('refund')" class="px-4 py-2 text-xs font-bold bg-white rounded-lg shadow-sm border border-slate-200 mr-2 focus:ring-2 ring-indigo-500">Refund</button>
+                <button onclick="loadPolicy('about')" class="px-4 py-2 text-xs font-bold bg-white rounded-lg shadow-sm border border-slate-200 focus:ring-2 ring-indigo-500">About</button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-5 text-sm text-slate-600 leading-relaxed" id="policyContentArea">
+                Select a policy to view.
+            </div>
+        </div>
+    </div>
+
+    <div id="bannerModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
+            <h3 class="font-bold text-slate-900 mb-4">Customize Shop Banner</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Banner Text</label>
+                    <input type="text" id="banText" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2 text-sm font-bold mt-1" placeholder="e.g. Welcome to my Shop">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase">Background Color</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <button onclick="setBanColor('#ef4444')" class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-transparent hover:ring-slate-400"></button>
+                        <button onclick="setBanColor('#f59e0b')" class="w-8 h-8 rounded-full bg-amber-500 ring-2 ring-transparent hover:ring-slate-400"></button>
+                        <button onclick="setBanColor('#10b981')" class="w-8 h-8 rounded-full bg-emerald-500 ring-2 ring-transparent hover:ring-slate-400"></button>
+                        <button onclick="setBanColor('#3b82f6')" class="w-8 h-8 rounded-full bg-blue-500 ring-2 ring-transparent hover:ring-slate-400"></button>
+                        <button onclick="setBanColor('#6366f1')" class="w-8 h-8 rounded-full bg-indigo-500 ring-2 ring-transparent hover:ring-slate-400"></button>
+                        <div class="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-slate-200">
+                            <input type="color" id="customColorPicker" class="absolute -top-2 -left-2 w-12 h-12 p-0 cursor-pointer" onchange="setBanColor(this.value)">
+                        </div>
+                    </div>
+                    <input type="hidden" id="selectedColor" value="#3b82f6">
+                </div>
+                <div class="flex gap-4">
+                    <div class="flex-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Text Color</label>
+                        <div class="flex gap-2 mt-1">
+                            <button onclick="setBanTextColor('#ffffff')" class="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm"></button>
+                            <button onclick="setBanTextColor('#1e293b')" class="w-8 h-8 rounded-full bg-slate-800 border border-slate-800 shadow-sm"></button>
+                            <button onclick="setBanTextColor('#facc15')" class="w-8 h-8 rounded-full bg-yellow-400 border border-yellow-400 shadow-sm"></button>
+                        </div>
+                        <input type="hidden" id="selectedTextColor" value="#ffffff">
+                    </div>
+                    <div class="flex-1">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase">Size</label>
+                        <select id="banFontSize" class="w-full mt-1 bg-slate-50 border border-slate-200 text-xs font-bold rounded p-2">
+                            <option value="text-lg">Normal</option>
+                            <option value="text-2xl" selected>Large</option>
+                            <option value="text-4xl">Extra Large</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 pt-2">
+                    <input type="checkbox" id="banBold" class="w-5 h-5 accent-indigo-600 rounded" checked>
+                    <label for="banBold" class="text-sm font-bold text-slate-700">Bold Text</label>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button onclick="document.getElementById('bannerModal').classList.add('hidden')" class="flex-1 py-3 text-slate-500 font-bold text-xs bg-slate-100 rounded-xl">CANCEL</button>
+                <button onclick="saveBannerSettings()" class="flex-1 py-3 text-white font-bold text-xs bg-slate-900 rounded-xl">APPLY</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addressModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg w-full max-w-xs p-5 shadow-2xl">
+            <h3 class="font-bold text-slate-800 mb-3">Shop Address</h3>
+            <textarea id="updateAddrText" class="w-full bg-slate-50 border border-slate-200 rounded p-3 text-sm resize-none h-24 mb-4" placeholder="Enter address..."></textarea>
+            <div class="flex gap-2">
+                <button onclick="closeAddressModal()" class="flex-1 py-2 text-slate-500 font-bold text-xs bg-slate-100 rounded">CANCEL</button>
+                <button onclick="saveAddress()" class="flex-1 py-2 text-white font-bold text-xs bg-slate-900 rounded">SAVE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal" class="hidden fixed inset-0 z-[70] bg-white flex flex-col">
+        <div class="bg-white border-b border-slate-100 p-4 flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+            <button onclick="closeHistory()" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 text-slate-600 hover:bg-slate-100"><i class="fa-solid fa-arrow-left"></i></button>
+            <h2 class="font-bold text-slate-900">Order History</h2>
+        </div>
+        <div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50"></div>
+    </div>
+
+    <div id="invoiceModal" class="fixed inset-0 bg-white z-[100] hidden p-8 flex flex-col overflow-y-auto">
+        <div class="text-center border-b-2 border-slate-800 pb-6 mb-6">
+            <h1 class="text-3xl font-extrabold text-slate-900 uppercase tracking-widest">INVOICE</h1>
+            <p class="text-slate-500 font-mono text-sm mt-2">Ramazone Delivery Service</p>
+        </div>
+        <div class="flex justify-between mb-8">
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase">Billed To</p>
+                <p class="font-bold text-lg text-slate-800" id="invName">Customer Name</p>
+                <p class="text-sm text-slate-600" id="invMobile">+91 XXXXX</p>
+                <p class="text-sm text-slate-600 mt-1 max-w-[200px]" id="invAddr">Address</p>
+            </div>
+            <div class="text-right">
+                <p class="text-xs font-bold text-slate-400 uppercase">Order Details</p>
+                <p class="font-bold text-lg text-slate-800" id="invId">#ORD-000</p>
+                <p class="text-sm text-slate-600" id="invDate">Jan 01, 2024</p>
+                <p class="text-sm font-bold text-green-600 mt-1" id="invStatus">DELIVERED</p>
+            </div>
+        </div>
+        <table class="w-full mb-8">
+            <thead class="bg-slate-100 border-b border-slate-200">
+                <tr>
+                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 uppercase">Item Description</th>
+                    <th class="text-right py-3 px-4 text-xs font-bold text-slate-500 uppercase">Qty</th>
+                </tr>
+            </thead>
+            <tbody id="invItems" class="text-sm text-slate-700 divide-y divide-slate-100"></tbody>
+        </table>
+        <div class="flex justify-end mb-12">
+            <div class="w-1/2">
+                <div class="flex justify-between py-2 border-b border-slate-100">
+                    <span class="font-bold text-slate-500">Delivery Fee</span>
+                    <span class="font-bold text-slate-800">₹<span id="invFee">0</span></span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="font-extrabold text-slate-900 text-lg">Total</span>
+                    <span class="font-extrabold text-slate-900 text-lg">₹<span id="invTotal">0</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="mt-auto text-center">
+            <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mb-2">Thank you for your business</p>
+            <div class="no-print">
+                <button onclick="window.print()" class="bg-slate-900 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:bg-black">PRINT / SAVE PDF</button>
+                <button onclick="document.getElementById('invoiceModal').classList.add('hidden')" class="ml-2 text-slate-500 font-bold py-3 px-8 hover:text-red-500">CLOSE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-xl z-[60] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex gap-2 items-center">
+        <i class="fa-solid fa-check-circle text-green-400"></i>
+        <span id="toastMsg">Updated</span>
+    </div>
+
+    <script src="home-core.js"></script>
+    <script src="home-features.js"></script>
+    <script>
+        // --- NEW FIX: PREVENT KEYBOARD CLOSE ON ADD CLICK ---
+        document.getElementById('productList').addEventListener('mousedown', function(e) {
+            // Check if user clicked a button (like the 'Add' button)
+            if(document.body.classList.contains('search-mode') && e.target.closest('button')) {
+                // Prevent default behavior (focus loss from input)
+                e.preventDefault();
+            }
+        });
+    </script>
+
+</body>
+</html>
