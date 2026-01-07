@@ -288,7 +288,8 @@ export default {
             borderClass = 'border-red-900/20 opacity-75';
         }
 
-        const mapLink = w.location ? `http://googleusercontent.com/maps.google.com/3{w.location.lat},${w.location.lng}` : '#';
+        const mapLink = w.location ? `https://www.google.com/maps/search/?api=1&query=${w.location.lat},${w.location.lng}` : '#';
+
 
         return `
             <div class="bg-slate-900 border ${borderClass} rounded-xl p-4 flex flex-col gap-3 shadow-md relative group hover:border-slate-700 transition">
