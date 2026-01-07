@@ -115,7 +115,7 @@ export default {
                                 <span class="text-xs font-bold text-blue-400 uppercase flex items-center gap-2"><i class="fa-solid fa-pen-to-square"></i> Edit Profile</span>
                                 <i class="fa-solid fa-chevron-down text-slate-500 group-open:rotate-180 transition"></i>
                             </summary>
-                            <div class="p-4 space-y-4 border-t border-slate-800 bg-slate-950/30">
+                            <div class="p-4 space-y-4 border-t border-slate-800 bg-slate-900/30">
                                 <div>
                                     <label class="text-[9px] text-slate-500 uppercase font-bold block mb-1">Full Name</label>
                                     <input type="text" id="edit-name" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-sm text-white focus:border-blue-500 focus:outline-none">
@@ -205,15 +205,13 @@ export default {
     },
 
     attachEvents(db) {
-        // --- PIN TOGGLE & MANAGE CLICK ---
+        // --- PIN TOGGLE & MANAGE CLICK (Active List) ---
         document.getElementById('active-list').addEventListener('click', (e) => {
-            // PIN Toggle
             const pinBtn = e.target.closest('.toggle-pin');
             if (pinBtn) {
                 const pin = pinBtn.dataset.pin;
                 const span = pinBtn.previousElementSibling;
                 const icon = pinBtn.querySelector('i');
-
                 if (span.innerText === '••••') {
                     span.innerText = pin;
                     span.classList.add('text-white', 'tracking-normal');
@@ -227,7 +225,6 @@ export default {
                 }
             }
 
-            // Manage Button
             const manageBtn = e.target.closest('.btn-manage');
             if(manageBtn) {
                 const data = JSON.parse(decodeURIComponent(manageBtn.dataset.json));
@@ -235,35 +232,55 @@ export default {
             }
         });
 
+        // 🔥 NEW: APPROVE LOGIC (Request List)
+        document.getElementById('request-list').addEventListener('click', (e) => {
+            const approveBtn = e.target.closest('button[data-action="approve"]');
+            if (approveBtn) {
+                const mobile = approveBtn.dataset.mobile;
+                const name = approveBtn.dataset.name;
+
+                if(confirm(`Approve ${name}?`)) {
+                    // Update Status to 'offline' (ready to work)
+                    db.ref(`deliveryBoys/${mobile}`).update({
+                        status: 'offline',
+                        verified: true,
+                        joinedAt: firebase.database.ServerValue.TIMESTAMP
+                    }).then(() => {
+                        const toast = document.createElement('div');
+                        toast.className = 'fixed top-6 left-1/2 -translate-x-1/2 bg-green-500 text-white px-6 py-3 rounded-full shadow-2xl z-[300] text-xs font-bold animate-fadeIn';
+                        toast.innerHTML = `<i class="fa-solid fa-check mr-2"></i> Approved ${name}`;
+                        document.body.appendChild(toast);
+                        setTimeout(() => toast.remove(), 3000);
+
+                        // Switch tab
+                        window.switchPartnerTab('active');
+                    });
+                }
+            }
+        });
+
         // --- MANAGE MODAL LOGIC ---
         const manageModal = document.getElementById('manage-modal');
         document.getElementById('close-manage').addEventListener('click', () => manageModal.classList.add('hidden'));
 
-        // Toggle Status
         document.getElementById('m-status-toggle').addEventListener('change', (e) => {
             const isChecked = e.target.checked;
             const newStatus = isChecked ? 'offline' : 'disabled';
-
             document.getElementById('m-status-text').innerText = isChecked ? 'Partner is ACTIVE' : 'Partner is DISABLED';
             document.getElementById('m-status-text').className = isChecked ? 'text-xs font-bold text-green-400' : 'text-xs font-bold text-red-400';
-
             db.ref('deliveryBoys/' + currentPartnerId).update({ status: newStatus });
         });
 
-        // Open Recovery inside Manage
         document.getElementById('btn-open-recovery').addEventListener('click', () => {
             this.openRecoveryModal();
         });
 
-        // Settlement
         document.getElementById('btn-settle').addEventListener('click', () => {
             const amountInput = document.getElementById('settle-amount');
             const amount = parseFloat(amountInput.value);
             if(!amount || amount <= 0) return alert("Enter valid amount");
-
             const currentBal = parseFloat(document.getElementById('m-balance').innerText);
             const newBal = currentBal - amount;
-
             db.ref('deliveryBoys/' + currentPartnerId).update({ walletBalance: newBal }).then(() => {
                 alert(`Settled ₹${amount}.`);
                 amountInput.value = '';
@@ -271,12 +288,10 @@ export default {
             });
         });
 
-        // Save Details
         document.getElementById('btn-save-details').addEventListener('click', () => {
             const newName = document.getElementById('edit-name').value;
             const newMobile = document.getElementById('edit-mobile-num').value;
             if(!newName || !newMobile) return alert("Fields empty");
-
             db.ref('deliveryBoys/' + currentPartnerId).update({ name: newName, mobile: newMobile }).then(() => {
                 document.getElementById('m-name').innerText = newName;
                 document.getElementById('m-mobile').innerText = "+91 " + newMobile;
@@ -284,7 +299,6 @@ export default {
             });
         });
 
-        // Delete
         document.getElementById('btn-delete-partner').addEventListener('click', () => {
             if(confirm("Permanently delete this partner?")) {
                 db.ref('deliveryBoys/' + currentPartnerId).remove();
@@ -311,25 +325,20 @@ export default {
 
     openManageModal(id, p) {
         currentPartnerId = id;
-        currentPartnerData = p; // Store for recovery
+        currentPartnerData = p;
         const modal = document.getElementById('manage-modal');
 
-        // Basic Info
         document.getElementById('m-avatar').innerText = p.name.charAt(0).toUpperCase();
         document.getElementById('m-name').innerText = p.name;
         document.getElementById('m-mobile').innerText = "+91 " + id;
         document.getElementById('m-pin-display').innerText = p.pin || '0000';
-
-        // Stats
         document.getElementById('m-earnings').innerText = p.earnings || 0;
         document.getElementById('m-online-status').innerText = (p.status || 'OFFLINE').toUpperCase();
         document.getElementById('m-balance').innerText = p.walletBalance || 0;
 
-        // Joined Date
         const joinDate = p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : 'Unknown';
         document.getElementById('m-joined').innerText = joinDate;
 
-        // Last Seen Logic
         let lastSeenText = "Never";
         if (p.lastHeartbeat) {
             const diff = Date.now() - p.lastHeartbeat;
@@ -344,7 +353,6 @@ export default {
         }
         document.getElementById('m-last-seen').innerText = lastSeenText;
 
-        // Toggle Switch State
         const toggle = document.getElementById('m-status-toggle');
         const statusText = document.getElementById('m-status-text');
 
@@ -358,10 +366,8 @@ export default {
             statusText.className = "text-xs font-bold text-red-400";
         }
 
-        // Edit Inputs
         document.getElementById('edit-name').value = p.name;
         document.getElementById('edit-mobile-num').value = id;
-
         modal.classList.remove('hidden');
     },
 
@@ -407,13 +413,11 @@ export default {
         });
     },
 
-    // --- CARD GENERATOR (Screenshot Style) ---
     createActiveCard(mobile, p) {
         const isOnline = p.status === 'online';
         const safeJson = encodeURIComponent(JSON.stringify(p));
         const batteryVal = p.battery || 0;
         const pin = p.pin || '0000';
-
         let battColor = 'text-green-500';
         if(batteryVal < 30) battColor = 'text-red-500';
 
@@ -470,8 +474,8 @@ export default {
                     <a href="https://wa.me/91${mobile}" target="_blank" class="flex-1 bg-slate-900 border border-slate-700 text-slate-300 py-2 rounded-lg text-[10px] font-bold text-center hover:bg-slate-800">
                         <i class="fa-brands fa-whatsapp text-green-500 mr-1"></i> Check
                     </a>
-                    <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-[10px] font-bold hover:bg-blue-500 shadow-lg shadow-blue-900/20" onclick="alert('Approve logic here')">
-                        APPROVE
+                    <button data-action="approve" data-mobile="${mobile}" data-name="${p.name}" class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-[10px] font-bold hover:bg-blue-500 shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 active:scale-95 transition">
+                        <i class="fa-solid fa-check"></i> APPROVE
                     </button>
                 </div>
             </div>
