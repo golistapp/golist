@@ -1,19 +1,19 @@
 /* styles.css */
 
-/* --- 1. SCROLLBARS (Purana Code) --- */
+/* --- 1. SCROLLBARS --- */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: #0f172a; 
+    background: #f1f5f9; 
 }
 ::-webkit-scrollbar-thumb {
-    background: #334155; 
+    background: #cbd5e1; 
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #475569; 
+    background: #94a3b8; 
 }
 
 .no-scrollbar::-webkit-scrollbar {
@@ -30,22 +30,36 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* --- 3. NAVIGATION --- */
-.nav-btn.active-nav {
-    background-color: #2563eb;
-    color: white;
-    font-weight: 600;
-    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
-}
-.nav-btn.active-nav i {
-    color: white !important;
-}
+/* --- 3. NAVIGATION (FIXED) --- */
+
+/* Force Active State Styles to Override Hover/Focus */
+.nav-btn.active-nav,
 .mob-nav-btn.active-nav {
-    background-color: #2563eb;
-    color: white;
+    background-color: #2563eb !important; /* Force Blue Background */
+    color: white !important;              /* Force White Text */
+    font-weight: 600;
+    box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.3);
 }
 
-/* --- 4. UTILITY ANIMATIONS (Fade & Spin) --- */
+/* Ensure Icons inside active buttons are White */
+.nav-btn.active-nav i,
+.mob-nav-btn.active-nav i {
+    color: white !important;
+}
+
+/* Hover effects ONLY when NOT active */
+.nav-btn:not(.active-nav):hover,
+.mob-nav-btn:not(.active-nav):hover {
+    background-color: #f1f5f9; /* Slate-100 */
+    color: #0f172a;           /* Slate-900 */
+}
+
+/* Default Inactive Text Color */
+.mob-nav-btn:not(.active-nav) {
+    color: #64748b; /* Slate-500 */
+}
+
+/* --- 4. UTILITY ANIMATIONS --- */
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(5px); }
     to { opacity: 1; transform: translateY(0); }
@@ -61,9 +75,7 @@ body {
     animation: spin 1s linear infinite;
 }
 
-/* --- 5. 🔥 NEW ANIMATIONS (Step 3 Update) --- */
-
-/* Slide In (Right to Left) - Customer Analysis Panel ke liye */
+/* --- 5. ANIMATIONS --- */
 @keyframes slideInRight {
     from { transform: translateX(100%); opacity: 0.5; }
     to { transform: translateX(0); opacity: 1; }
@@ -72,7 +84,6 @@ body {
     animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Slide Out (Left to Right) - Panel Close karne ke liye */
 @keyframes slideOutRight {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
@@ -81,7 +92,6 @@ body {
     animation: slideOutRight 0.25s ease-in forwards;
 }
 
-/* Scale In (Zoom Effect) - Popups/Modals ke liye */
 @keyframes scaleIn {
     from { transform: scale(0.95); opacity: 0; }
     to { transform: scale(1); opacity: 1; }
@@ -97,17 +107,26 @@ body {
     pointer-events: auto !important;
 }
 
-/* Map Popups */
 .leaflet-popup-content-wrapper {
-    background: #1e293b;
-    color: white;
-    border: 1px solid #334155;
+    background: #ffffff;
+    color: #1e293b;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 .leaflet-popup-tip {
-    background: #1e293b;
+    background: #ffffff;
 }
 
-/* Safe Area helper for Mobile Overlay */
 .safe-area-top {
     padding-top: env(safe-area-inset-top);
+}
+
+.custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    will-change: scroll-position;
+}
+
+img {
+    content-visibility: auto;
 }

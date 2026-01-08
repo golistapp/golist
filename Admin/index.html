@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Admin Golist</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-
+    
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,105 +16,124 @@
     
     <script type="text/javascript" src="https://unpkg.com/imagekit-javascript/dist/imagekit.min.js"></script>
 </head>
-<body class="bg-slate-950 text-white font-inter overflow-hidden h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 font-inter overflow-hidden h-screen flex flex-col">
 
-    <header class="bg-slate-900 border-b border-slate-800 h-16 flex items-center justify-between px-4 z-20 shrink-0">
+    <header class="bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 z-20 shrink-0 shadow-sm">
         <div class="flex items-center gap-3">
-            <button id="menu-toggle" class="md:hidden w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-slate-300 border border-slate-700">
+            <button id="menu-toggle" class="md:hidden w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-slate-600 border border-slate-200 hover:bg-slate-200 transition">
                 <i class="fa-solid fa-bars"></i>
             </button>
             
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-500/20">
                     <i class="fa-solid fa-shield-halved text-white text-sm"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight leading-none">Admin HQ</h1>
-                    <p class="text-[10px] text-slate-400 font-mono hidden sm:block">Smart Panel v2.0</p>
+                    <h1 class="text-lg font-bold tracking-tight leading-none text-slate-900">Admin HQ</h1>
+                    <p class="text-[10px] text-slate-500 font-mono hidden sm:block">Smart Panel v2.0</p>
                 </div>
             </div>
         </div>
         
         <div class="flex items-center gap-4">
-            <div id="connection-status" class="text-[10px] font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded border border-slate-700">
-                <i class="fa-solid fa-circle-notch fa-spin"></i> Connecting...
+            <div id="connection-status" class="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+                <i class="fa-solid fa-circle-notch fa-spin text-blue-500"></i> Connecting...
             </div>
         </div>
     </header>
 
     <div class="flex flex-1 overflow-hidden relative">
         
-        <aside class="w-64 bg-slate-900 border-r border-slate-800 hidden md:flex flex-col z-10">
+        <aside class="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <nav class="flex-1 p-4 space-y-2" id="desktop-nav">
-                <button data-route="dashboard" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3 active-nav">
+                <button data-route="dashboard" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3 active-nav">
                     <i class="fa-solid fa-box-open w-5 pointer-events-none"></i> Live Dashboard
                 </button>
-                <button data-route="map" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-map-location-dot w-5 text-green-400 pointer-events-none"></i> Live Map
+                <button data-route="map" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-map-location-dot w-5 text-green-500 pointer-events-none"></i> Live Map
                 </button>
-                <button data-route="partners" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-motorcycle w-5 text-amber-400 pointer-events-none"></i> Delivery Fleet
+                <button data-route="partners" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-motorcycle w-5 text-amber-500 pointer-events-none"></i> Delivery Fleet
                 </button>
-                <button data-route="inventory" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-database w-5 text-purple-400 pointer-events-none"></i> Inventory
+                
+                <div class="pt-4 pb-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Catalog Management</div>
+                
+                <button data-route="inventory" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-boxes-stacked w-5 text-purple-500 pointer-events-none"></i> Product Inventory
                 </button>
-                <button data-route="wholesalers" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-shop w-5 text-amber-500 pointer-events-none"></i> Verify Wholesalers
+                <button data-route="attributes" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-tags w-5 text-pink-500 pointer-events-none"></i> Attributes (Setup)
                 </button>
-                <button data-route="customers" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-users w-5 text-indigo-400 pointer-events-none"></i> Customer Database
+
+                <div class="pt-4 pb-2 px-4 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Operations</div>
+
+                <button data-route="wholesalers" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-shop w-5 text-amber-600 pointer-events-none"></i> Verify Wholesalers
                 </button>
-                <button data-route="history" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-clock-rotate-left w-5 text-slate-400 pointer-events-none"></i> Order History
+                <button data-route="customers" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-users w-5 text-indigo-500 pointer-events-none"></i> Customer Database
                 </button>
-                <button data-route="settings" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center gap-3">
-                    <i class="fa-solid fa-sliders w-5 text-slate-400 pointer-events-none"></i> App Config
+                <button data-route="history" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-clock-rotate-left w-5 text-slate-500 pointer-events-none"></i> Order History
+                </button>
+                <button data-route="settings" class="nav-btn w-full text-left px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-blue-700 transition flex items-center gap-3">
+                    <i class="fa-solid fa-sliders w-5 text-slate-500 pointer-events-none"></i> App Config
                 </button>
             </nav>
         </aside>
 
-        <main class="flex-1 bg-slate-950 relative w-full">
+        <main class="flex-1 bg-slate-50 relative w-full">
             
-            <div class="md:hidden flex gap-2 bg-slate-900 p-2 overflow-x-auto no-scrollbar border-b border-slate-800" id="mobile-nav">
-                <button data-route="dashboard" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center transition bg-blue-600 text-white min-w-[70px] flex flex-col items-center gap-1">
+            <div class="md:hidden flex gap-2 bg-white p-2 overflow-x-auto no-scrollbar border-b border-slate-200 shadow-sm" id="mobile-nav">
+                <button data-route="dashboard" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center transition bg-blue-600 text-white min-w-[70px] flex flex-col items-center gap-1 shadow-md shadow-blue-100">
                     <i class="fa-solid fa-box-open text-sm"></i>
                     DASHBOARD
                 </button>
-                <button data-route="map" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                <button data-route="map" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-map-location-dot text-sm"></i>
                     MAP
                 </button>
-                <button data-route="partners" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                <button data-route="partners" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-people-group text-sm"></i>
                     TEAM
                 </button>
-                <button data-route="wholesalers" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                
+                <button data-route="inventory" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
+                    <i class="fa-solid fa-boxes-stacked text-sm"></i>
+                    INVENTORY
+                </button>
+                <button data-route="attributes" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
+                    <i class="fa-solid fa-tags text-sm"></i>
+                    ATTRIBUTES
+                </button>
+                
+                <button data-route="wholesalers" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-shop text-sm"></i>
                     SHOPS
                 </button>
-                <button data-route="customers" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                <button data-route="customers" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-user-group text-sm"></i>
                     CUSTOMER
                 </button>
-                <button data-route="history" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                <button data-route="history" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-clock-rotate-left text-sm"></i>
                     HISTORY
                 </button>
-                <button data-route="settings" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-400 min-w-[70px] flex flex-col items-center gap-1">
+                <button data-route="settings" class="mob-nav-btn flex-shrink-0 px-3 py-2 text-[9px] font-bold rounded text-center text-slate-500 hover:bg-slate-50 min-w-[70px] flex flex-col items-center gap-1">
                     <i class="fa-solid fa-sliders text-sm"></i>
                     CONFIG
                 </button>
             </div>
 
             <div id="app-container" class="p-4 sm:p-6 h-full overflow-y-auto pb-24 md:pb-6">
-                <div class="flex flex-col items-center justify-center h-64 text-slate-500">
+                <div class="flex flex-col items-center justify-center h-64 text-slate-400">
                     <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-4 text-blue-500"></i>
                     <p>Initializing System...</p>
                 </div>
             </div>
 
-            <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-white text-slate-900 px-6 py-3 rounded-full shadow-2xl z-[100] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex items-center gap-2">
-                <i class="fa-solid fa-circle-info text-blue-600"></i>
+            <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl z-[100] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex items-center gap-2">
+                <i class="fa-solid fa-circle-info text-blue-400"></i>
                 <span id="toast-msg">System Ready</span>
             </div>
 

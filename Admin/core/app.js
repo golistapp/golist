@@ -50,11 +50,10 @@ class App {
     }
 
     async loadRoute(route) {
-        // 🔥 FIX: Route load hote hi Tab update karo
         this.updateActiveNav(route);
 
         this.container.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-slate-500 fade-in">
+            <div class="flex flex-col items-center justify-center h-full text-slate-400 fade-in">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-4 text-blue-500"></i>
                 <p>Loading ${route}...</p>
             </div>
@@ -76,20 +75,30 @@ class App {
     }
 
     updateActiveNav(route) {
-        // Remove active class from ALL buttons
+        // 1. Reset ALL buttons to Inactive State (Light Theme Friendly)
         document.querySelectorAll('.nav-btn, .mob-nav-btn').forEach(btn => {
+            // Active classes hatao
             btn.classList.remove('active-nav', 'bg-blue-600', 'text-white', 'shadow-lg');
-            btn.classList.add('text-slate-300'); // Reset text color
+
+            // Inactive color add karo (Dark Gray for Light Theme)
+            btn.classList.add('text-slate-500', 'hover:bg-slate-100');
+            btn.classList.remove('text-slate-300'); // Purana dark mode color hatao
 
             // Icon Reset
             const icon = btn.querySelector('i');
-            if(icon) icon.classList.remove('text-white');
+            if(icon) {
+                icon.classList.remove('text-white');
+                // Icon ko inherit color lene do
+            }
         });
 
-        // Add active class to CURRENT route button
+        // 2. Highlight CURRENT button
         document.querySelectorAll(`[data-route="${route}"]`).forEach(btn => {
+            // Active classes add karo
             btn.classList.add('active-nav', 'bg-blue-600', 'text-white', 'shadow-lg');
-            btn.classList.remove('text-slate-300');
+
+            // Inactive color hatao
+            btn.classList.remove('text-slate-500', 'hover:bg-slate-100');
 
             // Icon Highlight
             const icon = btn.querySelector('i');
