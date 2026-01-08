@@ -1,7 +1,14 @@
 // modules/settings.js
 
 // Firebase References for cleanup
+let bannersRef = null;
 let videosRef = null;
+
+// ImageKit Configuration (Replace with your actual keys if needed)
+const imageKit = new ImageKit({
+    publicKey: "public_key_test", // Yahan apni ImageKit Public Key dalein
+    urlEndpoint: "https://ik.imagekit.io/your_id", // Yahan apna URL Endpoint dalein
+});
 
 export default {
     async render(container, db) {
@@ -10,12 +17,15 @@ export default {
                 <div class="flex justify-between items-center border-b border-slate-800 pb-4 shrink-0">
                     <div>
                         <h2 class="text-2xl font-bold text-white">App Configuration</h2>
-                        <p class="text-xs text-slate-400">Control Policies & Video Content</p>
+                        <p class="text-xs text-slate-400">Control Content, Banners & Policies</p>
                     </div>
                 </div>
 
                 <div class="flex gap-2 border-b border-slate-800 pb-1">
-                    <button class="settings-tab active-tab px-4 py-2 text-xs font-bold text-white border-b-2 border-blue-500 transition" data-target="sec-policies">
+                    <button class="settings-tab active-tab px-4 py-2 text-xs font-bold text-white border-b-2 border-blue-500 transition" data-target="sec-banners">
+                        <i class="fa-solid fa-images mr-1"></i> Banners
+                    </button>
+                    <button class="settings-tab px-4 py-2 text-xs font-bold text-slate-400 border-b-2 border-transparent hover:text-white transition" data-target="sec-policies">
                         <i class="fa-solid fa-file-contract mr-1"></i> Policies
                     </button>
                     <button class="settings-tab px-4 py-2 text-xs font-bold text-slate-400 border-b-2 border-transparent hover:text-white transition" data-target="sec-videos">
@@ -25,7 +35,23 @@ export default {
 
                 <div class="flex-1 overflow-y-auto custom-scrollbar relative">
 
-                    <div id="sec-policies" class="settings-section space-y-4">
+                    <div id="sec-banners" class="settings-section space-y-4">
+                        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800">
+                            <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Upload New Banner</label>
+                            <input type="file" id="banner-file" accept="image/*" class="block w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-blue-400 hover:file:bg-slate-700 mb-3 cursor-pointer">
+                            <input type="text" id="banner-link" placeholder="Redirect Link (Optional)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs mb-3">
+                            <button id="btn-upload-banner" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 rounded-lg text-xs transition">
+                                <i class="fa-solid fa-cloud-arrow-up mr-1"></i> UPLOAD & PUBLISH
+                            </button>
+                        </div>
+
+                        <h3 class="font-bold text-sm text-white pt-2">Active Banners</h3>
+                        <div id="banners-list" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <p class="text-slate-500 text-xs py-4 col-span-full">Loading banners...</p>
+                        </div>
+                    </div>
+
+                    <div id="sec-policies" class="settings-section hidden space-y-4">
                         <div class="flex justify-between items-center">
                             <select id="policy-selector" class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none">
                                 <option value="privacy">Privacy Policy</option>
@@ -58,11 +84,13 @@ export default {
         `;
 
         this.initTabs();
+        this.initBanners(db);
         this.initPolicies(db);
         this.initVideos(db);
     },
 
     cleanup() {
+        if(bannersRef) bannersRef.off();
         if(videosRef) videosRef.off();
     },
 
@@ -87,7 +115,72 @@ export default {
         });
     },
 
-    // --- 2. BANNERS LOGIC REMOVED ---
+    // --- 2. BANNERS LOGIC ---
+    initBanners(db) {
+        const list = document.getElementById('banners-list');
+
+        // Load
+        bannersRef = db.ref('admin/sliders');
+        bannersRef.on('value', snap => {
+            if(!list) return;
+            list.innerHTML = '';
+            if(!snap.exists()) {
+                list.innerHTML = '<p class="text-slate-500 text-xs col-span-full py-4 text-center">No banners active.</p>';
+                return;
+            }
+            Object.entries(snap.val()).forEach(([key, val]) => {
+                const div = document.createElement('div');
+                div.className = "relative group rounded-lg overflow-hidden border border-slate-700";
+                div.innerHTML = `
+                    <img src="${val.img}" class="w-full h-32 object-cover opacity-80 group-hover:opacity-100 transition">
+                    <div class="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition gap-2">
+                        <button class="del-banner bg-red-600 text-white p-2 rounded-lg text-xs hover:bg-red-500" data-key="${key}"><i class="fa-solid fa-trash"></i></button>
+                        <a href="${val.img}" target="_blank" class="bg-slate-700 text-white p-2 rounded-lg text-xs hover:bg-slate-600"><i class="fa-solid fa-eye"></i></a>
+                    </div>
+                    <div class="absolute bottom-0 left-0 right-0 bg-black/70 p-1 text-[10px] text-slate-300 truncate text-center">${val.link || 'No Link'}</div>
+                `;
+                div.querySelector('.del-banner').addEventListener('click', () => {
+                    if(confirm("Delete Banner?")) db.ref('admin/sliders/' + key).remove();
+                });
+                list.appendChild(div);
+            });
+        });
+
+        // Upload
+        document.getElementById('btn-upload-banner').addEventListener('click', () => {
+            const file = document.getElementById('banner-file').files[0];
+            const link = document.getElementById('banner-link').value || '#';
+            const btn = document.getElementById('btn-upload-banner');
+
+            if(!file) return alert("Select an image");
+
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Uploading...';
+            btn.disabled = true;
+
+            imageKit.upload({
+                file: file,
+                fileName: "banner_" + Date.now() + ".jpg",
+                tags: ["banner"]
+            }, (err, result) => {
+                if(err) {
+                    alert("Upload Failed");
+                    console.error(err);
+                    btn.innerHTML = 'UPLOAD & PUBLISH';
+                    btn.disabled = false;
+                } else {
+                    db.ref('admin/sliders').push({ img: result.url, link: link }).then(() => {
+                        document.getElementById('banner-file').value = '';
+                        document.getElementById('banner-link').value = '';
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> Success';
+                        setTimeout(() => { 
+                            btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-1"></i> UPLOAD & PUBLISH';
+                            btn.disabled = false;
+                        }, 2000);
+                    });
+                }
+            });
+        });
+    },
 
     // --- 3. POLICIES LOGIC ---
     initPolicies(db) {
