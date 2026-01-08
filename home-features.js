@@ -1,27 +1,23 @@
 // --- FILE: home-features.js ---
-// Contains: Tracking, Slider, Owner Tools, History, Support, Settings, Add Stock Logic
+// Contains: Tracking, Owner Tools, History, Support, Settings, Add Stock Logic
 
 // --- GLOBAL VARIABLES FOR FEATURES ---
 let activeTrackingOrder = null;
 let historyData = {};
-let slides = [];
-let slideIndex = 1;
-let slideInterval;
-let isTransitioning = false;
 let selectedQtyValue = ''; // NEW: Stores selected quantity button value
 
 // --- TRACKING & BANNER LOGIC ---
 
 function checkActiveOrderHome() {
     const savedOrder = JSON.parse(localStorage.getItem('rmz_active_order'));
-    
+
     // 1. Check: Kya Local data exist karta hai?
     // 2. Check: Kya ye order abhi login kiye hue user (session.mobile) ka hi hai?
     if (savedOrder && session && savedOrder.user && savedOrder.user.mobile === session.mobile) {
-        
+
         // Active Status Check (Date check hata diya hai taaki purane active orders bhi dikhein)
         const activeStatuses = ['placed', 'accepted', 'out_for_delivery', 'admin_accepted'];
-        
+
         if (activeStatuses.includes(savedOrder.status)) {
             activateBanner(savedOrder);
             return; // Local data sahi hai, yahi use karo
@@ -38,10 +34,6 @@ function checkActiveOrderHome() {
     fetchActiveOrderFromCloud();
 }
 
-
-
-// home-features.js mein is function ko update karein
-
 function fetchActiveOrderFromCloud() {
     // Safety Check: Agar session nahi hai toh return karo
     if(!session || !session.mobile) return;
@@ -52,28 +44,26 @@ function fetchActiveOrderFromCloud() {
             const data = snap.val();
             const orderId = Object.keys(data)[0];
             const order = data[orderId];
-            
+
             // Timestamp fix
             let ts = order.timestamp; 
             if(typeof ts === 'object' || !ts) ts = Date.now();
 
             // ACTIVE ORDER LOGIC:
-            // Hum date check nahi karenge. Hum bas ye dekhenge ki order abhi chal raha hai ya nahi.
             const activeStatuses = ['placed', 'accepted', 'out_for_delivery', 'admin_accepted'];
 
             if (activeStatuses.includes(order.status)) {
                 const fullOrder = { id: orderId, ...order, timestamp: ts };
-                
+
                 // 1. Banner dikhao
                 activateBanner(fullOrder);
-                
+
                 // 2. Local Storage mein save kar lo taaki agli baar fast khule (Hybrid approach)
                 localStorage.setItem('rmz_active_order', JSON.stringify(fullOrder));
             }
         }
     });
 }
-
 
 function activateBanner(order) {
     activeTrackingOrder = order;
@@ -87,10 +77,10 @@ function syncHomeOrderStatus(orderId) {
         if(snap.exists()) {
             const updatedOrder = snap.val();
             activeTrackingOrder = { id: orderId, ...updatedOrder };
-            
+
             // Keep local storage updated
             localStorage.setItem('rmz_active_order', JSON.stringify(activeTrackingOrder));
-            
+
             updateBannerText(updatedOrder.status);
 
             // Update Modal if open
@@ -110,13 +100,13 @@ function syncHomeOrderStatus(orderId) {
 function updateBannerText(status) {
     const statusEl = document.getElementById('bannerStatus');
     let text = "Processing...";
-    
+
     // Map status codes to readable text
     if(status === 'placed') text = "Waiting for Confirmation";
     else if(status === 'accepted') text = "Partner Assigned";
     else if(status === 'out_for_delivery') text = "Out for Delivery";
     else if(status === 'delivered') text = "Delivered";
-    
+
     if(statusEl) statusEl.innerText = text;
 }
 
@@ -169,7 +159,7 @@ function renderTrackingModalUI(order) {
     // Show Edit/Cancel only if status is 'placed' (not accepted yet)
     if(order.status === 'placed' || order.status === 'admin_accepted') {
         pCard.classList.add('hidden');
-        
+
         actionsContainer.innerHTML = `
             <div class="flex gap-3">
                 <button onclick="cancelOrder()" class="flex-1 py-3 bg-red-50 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 border border-red-100 transition">CANCEL ORDER</button>
@@ -188,7 +178,7 @@ function renderTrackingModalUI(order) {
             // Accepted but no name yet
             pCard.classList.add('hidden');
         }
-        
+
         actionsContainer.innerHTML = `
             <p class="text-[10px] text-center text-slate-400 mb-3 font-bold uppercase">Need help?</p>
             <button onclick="openSupportOptions()" class="w-full py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">CONTACT SUPPORT</button>
@@ -231,7 +221,7 @@ function editOrder() {
         // 1. Restore items to cart
         localStorage.setItem('rmz_cart', JSON.stringify(activeTrackingOrder.cart));
         updateCartBadge();
-        
+
         // 2. Delete current order
         db.ref('orders/' + activeTrackingOrder.id).remove()
         .then(() => {
@@ -241,159 +231,22 @@ function editOrder() {
     }
 }
 
-// --- SLIDER LOGIC ---
-function initSeamlessSlider() {
-    slides = [];
-    
-    // 1. Fetch Shop Banner
-    db.ref(`users/${targetMobile}/banner`).once('value', uSnap => {
-        if(uSnap.exists()) {
-            const b = uSnap.val();
-            slides.push({ 
-                type: 'user', 
-                text: b.text || 'Welcome', 
-                color: b.color || '#3b82f6', 
-                bold: b.bold || false,
-                textColor: b.textColor || '#ffffff', 
-                fontSize: b.fontSize || 'text-2xl'
-            });
-        }
-        
-        // 2. Fetch Admin Sliders
-        db.ref('admin/sliders').once('value', aSnap => {
-            if(aSnap.exists()) {
-                Object.values(aSnap.val()).forEach(s => slides.push({ type: 'admin', img: s.img, link: s.link || '#' }));
-            }
-            // Fallback
-            if(slides.length === 0) slides.push({type: 'user', text: 'Welcome', color: '#1e293b', textColor: '#ffffff', fontSize: 'text-2xl'});
-            
-            renderSeamlessSlider();
-        });
-    });
-}
-
-function renderSeamlessSlider() {
-    const track = document.getElementById('sliderTrack');
-    const dotsContainer = document.getElementById('dotsContainer');
-    
-    // Need at least one slide
-    if(!track || slides.length === 0) return;
-
-    // Clone for seamless loop
-    const firstClone = slides[0];
-    const lastClone = slides[slides.length - 1];
-    const allSlides = [lastClone, ...slides, firstClone];
-    
-    track.innerHTML = '';
-    dotsContainer.innerHTML = '';
-    
-    // Render Slides
-    allSlides.forEach(s => {
-        const div = document.createElement('div');
-        div.className = "slide";
-        div.style.width = "100%"; 
-        if(s.type === 'user') {
-            div.style.backgroundColor = s.color;
-            div.innerHTML = `<span style="color: ${s.textColor};" class="px-8 text-center ${s.fontSize} ${s.bold ? 'font-extrabold' : 'font-medium'}">${s.text}</span>`;
-        } else {
-            div.innerHTML = `<img src="${s.img}" class="w-full h-full object-cover" onclick="window.location.href='${s.link}'">`;
-        }
-        track.appendChild(div);
-    });
-
-    // Render Dots
-    slides.forEach((_, idx) => {
-        const dot = document.createElement('div');
-        dot.className = `slider-dot ${idx === 0 ? 'active' : ''}`;
-        dotsContainer.appendChild(dot);
-    });
-
-    // Reset Position
-    track.style.transform = `translateX(-100%)`; 
-
-    // Start Auto Loop
-    startSeamlessInterval();
-    
-    // Event Listener for Loop Reset
-    track.addEventListener('transitionend', () => {
-        isTransitioning = false;
-        if (slideIndex >= slides.length + 1) {
-            track.style.transition = 'none';
-            slideIndex = 1;
-            track.style.transform = `translateX(-${slideIndex * 100}%)`;
-        }
-        if (slideIndex <= 0) {
-            track.style.transition = 'none';
-            slideIndex = slides.length;
-            track.style.transform = `translateX(-${slideIndex * 100}%)`;
-        }
-    });
-
-    // Touch Support
-    const container = document.getElementById('sliderContainer');
-    let startX = 0;
-    if(container) {
-        container.addEventListener('touchstart', e => { startX = e.touches[0].clientX; clearInterval(slideInterval); });
-        container.addEventListener('touchend', e => {
-            const endX = e.changedTouches[0].clientX;
-            if (startX - endX > 50) nextSeamlessSlide();
-            if (endX - startX > 50) prevSeamlessSlide();
-            startSeamlessInterval();
-        });
-    }
-}
-
-function nextSeamlessSlide() {
-    if (isTransitioning) return;
-    const track = document.getElementById('sliderTrack');
-    isTransitioning = true;
-    slideIndex++;
-    track.style.transition = 'transform 0.5s ease-in-out';
-    track.style.transform = `translateX(-${slideIndex * 100}%)`;
-    updateSeamlessDots();
-}
-
-function prevSeamlessSlide() {
-    if (isTransitioning) return;
-    const track = document.getElementById('sliderTrack');
-    isTransitioning = true;
-    slideIndex--;
-    track.style.transition = 'transform 0.5s ease-in-out';
-    track.style.transform = `translateX(-${slideIndex * 100}%)`;
-    updateSeamlessDots();
-}
-
-function updateSeamlessDots() {
-    let dotIndex = slideIndex - 1;
-    if (dotIndex < 0) dotIndex = slides.length - 1;
-    if (dotIndex >= slides.length) dotIndex = 0;
-
-    const dots = document.querySelectorAll('.slider-dot');
-    dots.forEach((d, i) => {
-        if(i === dotIndex) d.classList.add('active');
-        else d.classList.remove('active');
-    });
-}
-
-function startSeamlessInterval() {
-    clearInterval(slideInterval);
-    slideInterval = setInterval(nextSeamlessSlide, 3000);
-}
+// --- SLIDER LOGIC REMOVED ---
 
 // --- ADD/EDIT STOCK MODAL (UPDATED) ---
 function openAddModal(id = null, name = '', qty = '') {
     // UI Cleanup
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('menuOverlay').classList.remove('open');
-    
+
     const modal = document.getElementById('addStockModal');
     const card = document.getElementById('addStockCard');
     const nameInput = document.getElementById('inpProdName');
     const qtyInput = document.getElementById('inpProdQty');
-    
+
     // Clear Inputs & Suggestions
     document.getElementById('suggestionBox').innerHTML = '';
-    
+
     // Reset Buttons
     document.querySelectorAll('.qty-chip').forEach(b => {
         b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600', 'text-white');
@@ -409,7 +262,7 @@ function openAddModal(id = null, name = '', qty = '') {
         editItemId = id; 
         nameInput.value = name;
         qtyInput.value = qty;
-        
+
         // Try to highlight if it matches a preset
         let matched = false;
         document.querySelectorAll('.qty-chip').forEach(btn => {
@@ -424,7 +277,7 @@ function openAddModal(id = null, name = '', qty = '') {
         nameInput.value = '';
         qtyInput.value = ''; 
         selectedQtyValue = '';
-        
+
         // Auto Focus Name
         setTimeout(() => nameInput.focus(), 100);
         showSmartSuggestions();
@@ -456,9 +309,9 @@ function showSmartSuggestions() {
         const allMaster = Object.values(snap.val());
         // allProducts comes from home-core.js (loaded local cache)
         const userItemNames = (typeof allProducts !== 'undefined') ? allProducts.map(p => p[1].name.toLowerCase()) : [];
-        
+
         const notAdded = allMaster.filter(m => !userItemNames.includes(m.name.toLowerCase()));
-        
+
         const suggestions = [];
         for(let i=0; i<3 && notAdded.length > 0; i++) {
             const rIndex = Math.floor(Math.random() * notAdded.length);
@@ -502,7 +355,7 @@ function setQtyPreset(val, btn) {
     selectedQtyValue = val;
     const input = document.getElementById('inpProdQty');
     input.value = val;
-    
+
     // Reset Visuals
     document.querySelectorAll('.qty-chip').forEach(b => {
         b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600');
@@ -518,7 +371,7 @@ function setQtyPreset(val, btn) {
 function toggleCustomQty(btn) {
     selectedQtyValue = 'custom';
     const input = document.getElementById('inpProdQty');
-    
+
     // Reset Visuals
     document.querySelectorAll('.qty-chip').forEach(b => {
         b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600');
@@ -536,7 +389,7 @@ function toggleCustomQty(btn) {
 function adjustQty(delta) {
     const input = document.getElementById('inpProdQty');
     let currentVal = input.value.trim();
-    
+
     if(!currentVal) {
         input.value = delta > 0 ? "1 Unit" : "";
         return;
@@ -546,7 +399,7 @@ function adjustQty(delta) {
     if(match) {
         let num = parseFloat(match[1]);
         let unit = match[3] || ""; 
-        
+
         let step = 1;
         if(unit.toLowerCase().includes('g') && !unit.toLowerCase().includes('kg')) step = 50; 
         if(unit.toLowerCase().includes('ml')) step = 100;
@@ -609,7 +462,7 @@ function openHistory() {
         if(s.exists()) {
             const all = Object.values(s.val()).reverse().filter(o => o.status === 'delivered');
             if(all.length === 0) { list.innerHTML = '<div class="text-center p-8 text-slate-400">No delivered orders yet</div>'; return; }
-            
+
             all.forEach(o => {
                 historyData[o.orderId] = o;
                 const div = document.createElement('div');
@@ -667,7 +520,7 @@ function openVideoHelp() {
             Object.values(snap.val()).forEach(vid => {
                 const videoId = vid.link.split('v=')[1] || vid.link.split('/').pop();
                 const thumb = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-                
+
                 container.innerHTML += `
                     <div onclick="window.open('${vid.link}', '_blank')" class="flex gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100">
                         <div class="w-24 h-16 bg-black rounded-lg flex-shrink-0 overflow-hidden relative">
@@ -697,7 +550,7 @@ function openPolicies() {
 function loadPolicy(type) {
     const contentArea = document.getElementById('policyContentArea');
     contentArea.innerHTML = '<p class="text-center text-slate-400 mt-10">Loading...</p>';
-    
+
     db.ref('admin/policies/' + type).once('value', snap => {
         if(snap.exists()) {
             let text = snap.val();
@@ -758,7 +611,7 @@ function saveBannerSettings() {
     const textColor = document.getElementById('selectedTextColor').value;
     const fontSize = document.getElementById('banFontSize').value;
     const bold = document.getElementById('banBold').checked;
-    
+
     if(!text) return showToast("Enter Text");
 
     db.ref(`users/${targetMobile}/banner`).set({text, color, textColor, fontSize, bold})
@@ -770,32 +623,7 @@ function saveBannerSettings() {
 }
 
 // --- MISC ACTIONS ---
-function repeatLastOrder() {
-    if(activeTrackingOrder) return showToast("Finish current order first!");
-
-    showToast("Fetching last order...");
-    db.ref('orders').orderByChild('user/mobile').equalTo(session.mobile).limitToLast(1).once('value', snap => {
-        if (snap.exists()) {
-            const orderData = Object.values(snap.val())[0];
-            if(orderData && orderData.cart && orderData.cart.length > 0) {
-                let currentCart = JSON.parse(localStorage.getItem('rmz_cart')) || [];
-                
-                orderData.cart.forEach(prevItem => {
-                    currentCart = currentCart.filter(i => !(i.name === prevItem.name && i.qty === prevItem.qty));
-                    currentCart.push({ name: prevItem.name, qty: prevItem.qty, count: prevItem.count || 1 });
-                });
-
-                localStorage.setItem('rmz_cart', JSON.stringify(currentCart));
-                updateCartBadge();
-                showToast("Cart updated from previous order!");
-            } else {
-                showToast("Previous order was empty/invalid.");
-            }
-        } else {
-            showToast("No previous orders found.");
-        }
-    });
-}
+// REPEAT ORDER REMOVED
 
 function openSupportOptions() {
     document.getElementById('sidebar').classList.remove('open');

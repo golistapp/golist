@@ -30,60 +30,6 @@
         /* Custom Checkbox */
         .custom-check { width: 22px; height: 22px; accent-color: #ef4444; transform: scale(1.1); }
         
-        /* --- SLIDER CSS (16:4 Ratio) --- */
-        .slider-container {
-            width: 100%;
-            aspect-ratio: 16/4;
-            overflow: hidden;
-            position: relative;
-            background: #e2e8f0;
-        }
-        
-        .slider-wrapper {
-            display: flex;
-            height: 100%;
-        }
-        
-        .slide {
-            height: 100%;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            background-size: cover;
-            background-position: center;
-        }
-
-        /* Dot Indicators */
-        .slider-dot {
-            width: 6px; height: 6px; background: rgba(255,255,255,0.5); border-radius: 50%; transition: all 0.3s;
-        }
-        .slider-dot.active { width: 18px; background: white; border-radius: 10px; }
-
-        /* Stats Card Style */
-        .stat-card {
-            background: white;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 8px 4px;
-            text-align: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-            height: 80px; 
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .repeat-btn {
-            background: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .repeat-btn:active { transform: scale(0.95); background: #dcfce7; }
-
         /* Hide Scrollbar */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -131,18 +77,6 @@
         </button>
     </header>
 
-    <div id="statusBar" class="hide-on-search bg-green-50 border-b border-green-100 py-2 px-4 flex items-center justify-center gap-2 text-center w-full whitespace-nowrap overflow-hidden">
-        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"></span>
-        <p class="text-[11px] text-green-700 font-bold tracking-wide">Your store is live <span class="text-green-500 mx-1">•</span> <span class="font-medium text-green-600">managed by you</span></p>
-    </div>
-
-    <div class="hide-on-search slider-container" id="sliderContainer">
-        <div id="sliderTrack" class="slider-wrapper">
-            <div class="slide bg-slate-200"></div>
-        </div>
-        <div id="dotsContainer" class="absolute bottom-2 left-0 right-0 flex justify-center gap-1.5 z-10 pointer-events-none"></div>
-    </div>
-
     <div id="liveOrderBanner" onclick="openTrackingModal()" class="hidden hide-on-search mx-4 mt-4 bg-white rounded-xl shadow-lg border border-blue-100 p-4 flex items-center justify-between relative overflow-hidden active:scale-95 transition cursor-pointer group">
         <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500"></div>
         <div class="flex items-center gap-3">
@@ -165,24 +99,6 @@
         </div>
     </div>
 
-    <div id="statsSection" class="hide-on-search px-4 py-3 grid grid-cols-3 gap-2">
-        <div class="stat-card">
-            <p class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">Products</p>
-            <p class="text-lg font-extrabold text-slate-800 leading-none" id="statProductCount">0</p>
-            <p class="text-[9px] text-slate-400 font-medium mt-1 bg-slate-100 px-1.5 rounded">Total Items</p>
-        </div>
-        <div class="stat-card">
-            <p class="text-[10px] text-slate-400 font-bold uppercase mb-0.5">Today</p>
-            <p class="text-lg font-extrabold text-indigo-600 leading-none" id="statOrderCount">0</p>
-            <p class="text-[9px] text-slate-400 font-medium mt-1 bg-indigo-50 text-indigo-400 px-1.5 rounded">New Orders</p>
-        </div>
-        <div class="stat-card repeat-btn" onclick="repeatLastOrder()">
-            <p class="text-[10px] text-green-600 font-bold uppercase mb-0.5">Quick Action</p>
-            <i class="fa-solid fa-clock-rotate-left text-xl text-green-600 mb-1"></i>
-            <p class="text-[9px] text-white font-bold bg-green-600 px-2 py-0.5 rounded-full">REPEAT ORDER</p>
-        </div>
-    </div>
-
     <div id="menuOverlay" class="overlay fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onclick="toggleMenu()"></div>
     <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[80%] max-w-[300px] bg-white z-50 shadow-2xl flex flex-col">
         <div class="p-6 bg-slate-900 text-white relative">
@@ -202,7 +118,7 @@
 
     <div class="px-4 pb-10 min-h-[50vh] mt-0.5 relative">
         
-        <div id="searchContainer" class="search-container flex items-center justify-between px-1 mb-3 border-t border-slate-100 pt-3 gap-3 bg-transparent transition-all duration-300">
+        <div id="searchContainer" class="search-container flex items-center justify-between px-1 mb-3 pt-3 gap-3 bg-transparent transition-all duration-300">
             <div class="flex-1">
                 <div class="relative">
                     <input type="text" id="searchInput" onfocus="activateSearch()" onblur="deactivateSearch()" onkeyup="filterProducts()" placeholder="Search items..." class="w-full bg-white border border-slate-300 rounded-full py-2 pl-9 pr-8 text-xs font-bold focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition-all">
@@ -232,8 +148,6 @@
             </div>
         </div>
 
-        <!-- MAGIC BOX REMOVED AS REQUESTED -->
-
         <ul id="productList" class="space-y-0.5 mt-2">
             <div class="text-center py-12">
                 <div class="loader inline-block"></div>
@@ -258,7 +172,6 @@
             <i class="fa-solid fa-plus text-lg"></i>
         </button>
 
-        <!-- UPDATED CHECKOUT BUTTON -->
         <button onclick="window.location.href='cart.html'" class="cart-float text-white rounded-full pl-6 pr-8 py-2.5 flex items-center gap-3 active:scale-95 transition-all group shadow-2xl">
             <div class="relative">
                 <i class="fa-solid fa-receipt text-xl group-hover:rotate-12 transition duration-300"></i>
@@ -345,80 +258,55 @@
         </div>
     </div>
 
-    <!-- MAGIC BOX MODAL REMOVED -->
-
-    <!-- NEW ADD STOCK MODAL (UPDATED) -->
-<!-- REPLACE THE OLD "addStockModal" DIV WITH THIS NEW COMPACT VERSION -->
-<div id="addStockModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full sm:translate-y-0 relative" id="addStockCard">
-        
-        <!-- Close Button -->
-        <button onclick="closeAddModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center z-10">
-            <i class="fa-solid fa-xmark"></i>
-        </button>
-
-        <div class="space-y-4 mt-1">
+    <div id="addStockModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full sm:translate-y-0 relative" id="addStockCard">
             
-            <!-- Suggestion & Name Input (Ultra Compact) -->
-            <div class="relative">
-                <div id="suggestionBox" class="flex flex-wrap gap-2 mb-1 justify-start items-end min-h-[20px] transition-all">
-                    <!-- Suggestions will appear here -->
-                </div>
+            <button onclick="closeAddModal()" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center z-10">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+    
+            <div class="space-y-4 mt-1">
                 
-                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Product Name</label>
-                <input type="text" id="inpProdName" autocomplete="off" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all placeholder:text-slate-300" placeholder="Type name...">
-            </div>
-
-            <!-- Quantity Section -->
-            <div>
-                <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Set Quantity</label>
-                
-                <!-- Main Control Row (Compact Height, Wide Buttons) -->
-                <div id="qtyControlRow" class="flex items-center gap-2 mb-2 transition-all">
-                    <!-- Wider Buttons (w-24) & Compact Height (h-10) -->
-                    <button onclick="adjustQty(-1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
-                        <i class="fa-solid fa-minus text-lg"></i>
-                    </button>
+                <div class="relative">
+                    <div id="suggestionBox" class="flex flex-wrap gap-2 mb-1 justify-start items-end min-h-[20px] transition-all">
+                        </div>
                     
-                    <input type="text" id="inpProdQty" class="flex-1 h-10 bg-slate-50 border border-slate-200 rounded-xl px-2 text-center text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="Qty">
-                    
-                    <!-- Wider Buttons (w-24) & Compact Height (h-10) -->
-                    <button onclick="adjustQty(1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
-                        <i class="fa-solid fa-plus text-lg"></i>
-                    </button>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Product Name</label>
+                    <input type="text" id="inpProdName" autocomplete="off" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all placeholder:text-slate-300" placeholder="Type name...">
                 </div>
-
-                <!-- Single Line Scrollable Presets -->
-                <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                    <button onclick="setQtyPreset('100 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">100 g</button>
-                    <button onclick="setQtyPreset('250 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">250 g</button>
-                    <button onclick="setQtyPreset('500 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">500 g</button>
-                    <button onclick="setQtyPreset('1 kg', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 kg</button>
-                    <button onclick="setQtyPreset('1 Pkt', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pkt</button>
-                    <button onclick="setQtyPreset('1 Pc', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pc</button>
+    
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1 mb-1 block">Set Quantity</label>
                     
-                    
-                    <!-- CUSTOM BUTTON -->
-                    <button onclick="toggleCustomQty(this)" class="qty-chip shrink-0 px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold rounded-lg text-xs hover:bg-indigo-600 hover:text-white transition">Custom</button>
+                    <div id="qtyControlRow" class="flex items-center gap-2 mb-2 transition-all">
+                        <button onclick="adjustQty(-1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
+                            <i class="fa-solid fa-minus text-lg"></i>
+                        </button>
+                        
+                        <input type="text" id="inpProdQty" class="flex-1 h-10 bg-slate-50 border border-slate-200 rounded-xl px-2 text-center text-lg font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900" placeholder="Qty">
+                        
+                        <button onclick="adjustQty(1)" class="w-24 h-10 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 active:scale-95 transition flex items-center justify-center">
+                            <i class="fa-solid fa-plus text-lg"></i>
+                        </button>
+                    </div>
+    
+                    <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                        <button onclick="setQtyPreset('100 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">100 g</button>
+                        <button onclick="setQtyPreset('250 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">250 g</button>
+                        <button onclick="setQtyPreset('500 g', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">500 g</button>
+                        <button onclick="setQtyPreset('1 kg', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 kg</button>
+                        <button onclick="setQtyPreset('1 Pkt', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pkt</button>
+                        <button onclick="setQtyPreset('1 Pc', this)" class="qty-chip shrink-0 px-4 py-2 rounded-lg border border-slate-100 bg-white text-xs font-bold text-slate-500 hover:bg-slate-50 hover:border-slate-300 transition">1 Pc</button>
+                        
+                        
+                        <button onclick="toggleCustomQty(this)" class="qty-chip shrink-0 px-4 py-2 bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold rounded-lg text-xs hover:bg-indigo-600 hover:text-white transition">Custom</button>
+                    </div>
                 </div>
+    
+                <button onclick="saveProduct()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition text-sm tracking-wide">SAVE PRODUCT</button>
             </div>
-
-            <!-- Save Button -->
-            <button onclick="saveProduct()" class="w-full bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition text-sm tracking-wide">SAVE PRODUCT</button>
         </div>
     </div>
-</div>
-
-
-
-
-
-
-
-
-
-
-
 
     <div id="profileMenuModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
         <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl animate-[slideUp_0.3s_ease-out]">
@@ -427,9 +315,6 @@
                 <button onclick="closeModal('profileMenuModal')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:bg-slate-100 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="space-y-3">
-                <button onclick="document.getElementById('bannerModal').classList.remove('hidden'); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-                    <i class="fa-solid fa-image text-pink-500 w-6"></i> Banner Settings
-                </button>
                 <button onclick="changeShopName(); closeModal('profileMenuModal');" class="w-full text-left px-4 py-3.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
                     <i class="fa-solid fa-store text-blue-500 w-6"></i> Change Shop Name
                 </button>
@@ -473,59 +358,6 @@
             </div>
             <div class="flex-1 overflow-y-auto p-5 text-sm text-slate-600 leading-relaxed" id="policyContentArea">
                 Select a policy to view.
-            </div>
-        </div>
-    </div>
-
-    <div id="bannerModal" class="hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-xl">
-            <h3 class="font-bold text-slate-900 mb-4">Customize Shop Banner</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Banner Text</label>
-                    <input type="text" id="banText" class="w-full bg-slate-50 border border-slate-200 rounded px-3 py-2 text-sm font-bold mt-1" placeholder="e.g. Welcome to my Shop">
-                </div>
-                <div>
-                    <label class="text-[10px] font-bold text-slate-400 uppercase">Background Color</label>
-                    <div class="flex items-center gap-2 mt-1">
-                        <button onclick="setBanColor('#ef4444')" class="w-8 h-8 rounded-full bg-red-500 ring-2 ring-transparent hover:ring-slate-400"></button>
-                        <button onclick="setBanColor('#f59e0b')" class="w-8 h-8 rounded-full bg-amber-500 ring-2 ring-transparent hover:ring-slate-400"></button>
-                        <button onclick="setBanColor('#10b981')" class="w-8 h-8 rounded-full bg-emerald-500 ring-2 ring-transparent hover:ring-slate-400"></button>
-                        <button onclick="setBanColor('#3b82f6')" class="w-8 h-8 rounded-full bg-blue-500 ring-2 ring-transparent hover:ring-slate-400"></button>
-                        <button onclick="setBanColor('#6366f1')" class="w-8 h-8 rounded-full bg-indigo-500 ring-2 ring-transparent hover:ring-slate-400"></button>
-                        <div class="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-slate-200">
-                            <input type="color" id="customColorPicker" class="absolute -top-2 -left-2 w-12 h-12 p-0 cursor-pointer" onchange="setBanColor(this.value)">
-                        </div>
-                    </div>
-                    <input type="hidden" id="selectedColor" value="#3b82f6">
-                </div>
-                <div class="flex gap-4">
-                    <div class="flex-1">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Text Color</label>
-                        <div class="flex gap-2 mt-1">
-                            <button onclick="setBanTextColor('#ffffff')" class="w-8 h-8 rounded-full bg-white border border-slate-200 shadow-sm"></button>
-                            <button onclick="setBanTextColor('#1e293b')" class="w-8 h-8 rounded-full bg-slate-800 border border-slate-800 shadow-sm"></button>
-                            <button onclick="setBanTextColor('#facc15')" class="w-8 h-8 rounded-full bg-yellow-400 border border-yellow-400 shadow-sm"></button>
-                        </div>
-                        <input type="hidden" id="selectedTextColor" value="#ffffff">
-                    </div>
-                    <div class="flex-1">
-                        <label class="text-[10px] font-bold text-slate-400 uppercase">Size</label>
-                        <select id="banFontSize" class="w-full mt-1 bg-slate-50 border border-slate-200 text-xs font-bold rounded p-2">
-                            <option value="text-lg">Normal</option>
-                            <option value="text-2xl" selected>Large</option>
-                            <option value="text-4xl">Extra Large</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="flex items-center gap-3 pt-2">
-                    <input type="checkbox" id="banBold" class="w-5 h-5 accent-indigo-600 rounded" checked>
-                    <label for="banBold" class="text-sm font-bold text-slate-700">Bold Text</label>
-                </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button onclick="document.getElementById('bannerModal').classList.add('hidden')" class="flex-1 py-3 text-slate-500 font-bold text-xs bg-slate-100 rounded-xl">CANCEL</button>
-                <button onclick="saveBannerSettings()" class="flex-1 py-3 text-white font-bold text-xs bg-slate-900 rounded-xl">APPLY</button>
             </div>
         </div>
     </div>
@@ -618,3 +450,4 @@
 
 </body>
 </html>
+

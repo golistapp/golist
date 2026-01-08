@@ -37,16 +37,15 @@ window.onload = () => {
     setupUI();
     loadShopData();
     updateCartBadge();
-    
+
     // 2. Core Content (Products)
     loadLocalProducts(); // Show cached first for speed
     syncProducts();      // Then fetch fresh from Firebase
-    calculateStats();
+    // Stats calculation removed
 
     // 3. Feature Loading (Functions from home-features.js)
-    // We check if functions exist to avoid errors if file is missing
     if (typeof loadProfile === 'function') loadProfile();
-    if (typeof initSeamlessSlider === 'function') initSeamlessSlider();
+    // Slider init removed
     if (typeof checkActiveOrderHome === 'function') checkActiveOrderHome();
 };
 
@@ -90,7 +89,7 @@ function setupUI() {
         document.getElementById('logoUploadBtn').classList.remove('hidden');
         document.getElementById('menuName').innerText = session.name || 'Owner';
         document.getElementById('menuMobile').innerText = '+91 ' + session.mobile;
-        
+
         // Note: openAddModal, openHistory, etc. are in home-features.js
         menuHtml += `
             <button onclick="openAddModal()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
@@ -99,9 +98,9 @@ function setupUI() {
             <button onclick="openHistory()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
                 <i class="fa-solid fa-clock-rotate-left text-blue-500 w-5"></i> Order History
             </button>
-            
+
             <div class="h-px bg-slate-100 my-2"></div>
-            
+
             <button onclick="document.getElementById('profileMenuModal').classList.remove('hidden'); toggleMenu();" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
                 <i class="fa-solid fa-user-gear text-slate-500 w-5"></i> My Shop Profile
             </button>
@@ -120,11 +119,11 @@ function setupUI() {
         <button onclick="openVideoHelp()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
             <i class="fa-brands fa-youtube text-red-500 w-5"></i> How to Use App
         </button>
-        
+
         <button onclick="openSupportOptions()" class="w-full text-left px-4 py-3 rounded hover:bg-green-50 text-green-600 font-bold text-sm flex items-center gap-3">
             <i class="fa-brands fa-whatsapp w-5 text-xl"></i> Contact Support
         </button>
-        
+
         <button onclick="openPolicies()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
             <i class="fa-solid fa-shield-halved text-slate-400 w-5"></i> Policies & Terms
         </button>
@@ -148,22 +147,7 @@ function loadShopData() {
     });
 }
 
-// --- STATS SYSTEM ---
-function calculateStats() {
-    if(isOwner) {
-        db.ref('orders').orderByChild('user/mobile').equalTo(targetMobile).on('value', snap => {
-            let todayCount = 0;
-            if(snap.exists()) {
-                const now = new Date();
-                const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-                Object.values(snap.val()).forEach(order => {
-                    if(order.timestamp >= startOfDay) todayCount++;
-                });
-            }
-            document.getElementById('statOrderCount').innerText = todayCount;
-        });
-    }
-}
+// --- STATS SYSTEM REMOVED ---
 
 // --- PRODUCT LOADING ---
 function loadLocalProducts() {
@@ -171,7 +155,7 @@ function loadLocalProducts() {
     if(cached) { 
         allProducts = JSON.parse(cached);
         filteredProducts = allProducts; 
-        document.getElementById('statProductCount').innerText = allProducts.length;
+        // Stat update removed
         renderList(allProducts); 
     }
 }
@@ -181,9 +165,9 @@ function syncProducts() {
         if(snapshot.exists()) {
             allProducts = Object.entries(snapshot.val()).reverse();
             localStorage.setItem(CACHE_KEY, JSON.stringify(allProducts));
-            
-            document.getElementById('statProductCount').innerText = allProducts.length;
-            
+
+            // Stat update removed
+
             // Keep search filter if active
             const query = document.getElementById('searchInput').value.toLowerCase();
             if(query) filterProducts(); 
@@ -195,7 +179,7 @@ function syncProducts() {
             allProducts = [];
             filteredProducts = [];
             localStorage.removeItem(CACHE_KEY);
-            document.getElementById('statProductCount').innerText = "0";
+            // Stat update removed
             renderList([]);
         }
     });
@@ -216,7 +200,7 @@ function filterProducts() {
 function renderList(products) {
     const list = document.getElementById('productList');
     list.innerHTML = '';
-    
+
     if(products.length === 0) {
         list.innerHTML = `<div class="p-8 text-center opacity-50"><p class="text-xs">No items found</p></div>`;
         return;
@@ -225,7 +209,7 @@ function renderList(products) {
     products.forEach(([id, item]) => {
         const li = document.createElement('li');
         li.className = "bg-white border-b border-slate-50 p-4 flex items-center justify-between hover:bg-slate-50 transition-colors";
-        
+
         let leftContent = `
             <div>
                 <h4 class="font-bold text-slate-800 text-sm">${item.name}</h4>
@@ -334,14 +318,14 @@ function deactivateSearch() {
 function clearSearch() {
     const input = document.getElementById('searchInput');
     input.value = '';
-    
+
     // Reset products
     filterProducts(); 
-    
+
     // Reset UI
     document.body.classList.remove('search-mode');
     document.getElementById('headerControls').classList.remove('hidden');
     document.getElementById('clearSearchBtn').classList.add('hidden');
-    
+
     input.blur(); 
 }
