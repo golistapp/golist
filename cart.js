@@ -1,3 +1,5 @@
+// cart.js
+
 // --- CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyCmgMr4cj7ec1B09eu3xpRhCwsVCeQR9v0",
@@ -19,7 +21,6 @@ let currentStep = 1;
 let selectedCharge = 0;
 let selectedLabel = "";
 let selectedBudget = "standard";
-// Default set to Evening to match HTML
 let selectedTime = "Evening"; 
 let selectedAddress = null;
 let tempGeoData = null;
@@ -28,14 +29,11 @@ let tempGeoData = null;
 window.onload = () => {
     checkActiveOrder();
     renderCart();
-    
+
     // UI Defaults
     highlightBudget('standard');
-    
-    // FORCE UPDATE TIME UI ON LOAD (Silent Mode)
-    // Yeh line ensure karegi ki text "Standard" na dikhe balki "Evening" dikhe
     updateTimeUI('Evening', false); 
-    
+
     // Auto-Location Logic
     initLocationLogic();
 };
@@ -91,17 +89,17 @@ function disablePlaceOrderButton() {
 function goToDetails() {
     const cart = getCart();
     if (cart.length === 0) return showToast("Cart is empty");
-    
+
     currentStep = 2;
     document.getElementById('step1_cart').classList.add('hidden-step');
     document.getElementById('btnStep1').classList.add('hidden');
-    
+
     document.getElementById('step2_details').classList.remove('hidden-step');
     document.getElementById('btnStep2').classList.remove('hidden');
-    
+
     document.getElementById('pageTitle').innerText = "Delivery Details";
     document.getElementById('pageSub').innerText = "Final Step";
-    
+
     window.scrollTo(0, 0);
 }
 
@@ -110,10 +108,10 @@ function handleBack() {
         currentStep = 1;
         document.getElementById('step2_details').classList.add('hidden-step');
         document.getElementById('btnStep2').classList.add('hidden');
-        
+
         document.getElementById('step1_cart').classList.remove('hidden-step');
         document.getElementById('btnStep1').classList.remove('hidden');
-        
+
         document.getElementById('pageTitle').innerText = "My Cart";
         document.getElementById('pageSub').innerText = "Review Items";
     } else {
@@ -140,23 +138,30 @@ function renderCart() {
     document.getElementById('bottomBar').classList.remove('hidden');
 
     cart.forEach((item, idx) => {
+        // Calculate item total for display
+        const itemPrice = parseFloat(item.price) || 0;
+        const itemCount = item.count || 1;
+        const itemTotal = itemPrice * itemCount;
+
         const div = document.createElement('div');
         div.className = "flex items-center justify-between p-4";
         div.innerHTML = `
             <div>
                 <h4 class="font-bold text-slate-800 text-sm">${item.name}</h4>
-                <p class="text-[11px] text-slate-400 font-bold uppercase mt-0.5">${item.qty}</p>
+                <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${item.qty} • ₹${itemPrice} x ${itemCount}</p>
+                <p class="text-xs font-bold text-golist mt-0.5">₹${itemTotal}</p>
             </div>
             <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-1 border border-slate-200">
                 <button onclick="updateQty(${idx}, -1)" class="qty-btn bg-white text-slate-600 shadow-sm hover:text-red-500"><i class="fa-solid fa-minus text-[10px]"></i></button>
-                <span class="text-xs font-bold text-slate-800 w-4 text-center">${item.count || 1}</span>
+                <span class="text-xs font-bold text-slate-800 w-4 text-center">${itemCount}</span>
                 <button onclick="updateQty(${idx}, 1)" class="qty-btn bg-slate-800 text-white shadow-md hover:bg-black"><i class="fa-solid fa-plus text-[10px]"></i></button>
             </div>
         `;
         list.appendChild(div);
     });
-    
+
     calculateWeight(cart);
+    updateTotals(); // Ensure totals are updated immediately
 }
 
 function updateQty(idx, change) {
@@ -164,7 +169,7 @@ function updateQty(idx, change) {
     const item = cart[idx];
     if (!item.count) item.count = 1;
     const newCount = item.count + change;
-    
+
     if (newCount < 1) {
         if(confirm(`Remove ${item.name}?`)) cart.splice(idx, 1);
         else return;
@@ -188,7 +193,7 @@ function closeLocationModal() {
 function loadSavedAddresses() {
     const list = document.getElementById('addressList');
     list.innerHTML = '';
-    
+
     list.innerHTML += `
         <div onclick="selectLiveLocation()" class="addr-card ${!selectedAddress || selectedAddress.type === 'live' ? 'selected' : ''} bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center gap-3 cursor-pointer hover:bg-slate-100">
             <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-crosshairs"></i></div>
@@ -229,7 +234,7 @@ function loadSavedAddresses() {
                 `;
             });
         }
-        
+
         const btnAdd = document.getElementById('btnAddLocation');
         if(count >= 3) btnAdd.classList.add('hidden');
         else btnAdd.classList.remove('hidden');
@@ -239,14 +244,14 @@ function loadSavedAddresses() {
 function addNewLocation() {
     const btn = document.getElementById('btnAddLocation');
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Detecting GPS...';
-    
+
     if("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(async p => {
             const lat = p.coords.latitude;
             const lng = p.coords.longitude;
             tempGeoData = { lat, lng };
             document.getElementById('detectedCoords').innerText = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            
+
             try {
                 const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
                 const data = await res.json();
@@ -256,7 +261,7 @@ function addNewLocation() {
             document.getElementById('addressList').classList.add('hidden');
             document.getElementById('btnAddLocation').classList.add('hidden');
             document.getElementById('addAddrForm').classList.remove('hidden');
-            
+
         }, () => { showToast("GPS Permission Denied"); btn.innerHTML = 'Retry GPS'; });
     }
 }
@@ -265,7 +270,7 @@ function saveNewAddress() {
     const title = document.getElementById('newAddrTitle').value.trim();
     const text = document.getElementById('newAddrText').value.trim();
     if(!title || !text || !tempGeoData) return showToast("Fill all details");
-    
+
     const newAddr = { title, text, lat: tempGeoData.lat, lng: tempGeoData.lng };
     const newRef = db.ref('users/' + session.mobile + '/savedAddresses').push();
     newRef.set(newAddr).then(() => {
@@ -308,7 +313,7 @@ function selectSavedAddress(key, title, text, lat, lng) {
 function selectLiveLocation() {
     const btnTitle = document.getElementById('dispAddrTitle');
     btnTitle.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Detecting...';
-    
+
     if("geolocation" in navigator) {
         navigator.geolocation.getCurrentPosition(async p => {
             const lat = p.coords.latitude;
@@ -341,12 +346,12 @@ function calculateWeight(cart) {
     cart.forEach(item => {
         let txt = item.qty.toLowerCase().replace(/\s/g, '');
         let weight = 0; let mul = item.count || 1; let match;
-        
+
         if (match = txt.match(/(\d+(\.\d+)?)kg/)) weight = parseFloat(match[1]);
         else if ((match = txt.match(/(\d+)g/)) || (match = txt.match(/(\d+)gm/))) weight = parseFloat(match[1]) / 1000;
         else if ((match = txt.match(/(\d+(\.\d+)?)l/)) || (match = txt.match(/(\d+(\.\d+)?)ltr/))) weight = parseFloat(match[1]);
         else if (match = txt.match(/(\d+)ml/)) weight = parseFloat(match[1]) / 1000;
-        
+
         totalKg += (weight * mul);
     });
 
@@ -377,7 +382,7 @@ function manualSelectRate(amt) {
 
 function selectRateLocked(amt, lbl) {
     selectedCharge = amt; selectedLabel = lbl;
-    
+
     document.querySelectorAll('.slab-card').forEach(c => {
         c.classList.remove('selected');
         c.classList.add('disabled');
@@ -396,8 +401,24 @@ function selectRateLocked(amt, lbl) {
 }
 
 function updateTotals() {
-    document.getElementById('cartTotal').innerText = selectedCharge;
-    document.getElementById('finalTotal').innerText = selectedCharge;
+    const cart = getCart();
+    let itemTotal = 0;
+    cart.forEach(item => {
+        itemTotal += (parseFloat(item.price) || 0) * (item.count || 1);
+    });
+
+    const grandTotal = itemTotal + selectedCharge;
+
+    // Update Step 1 Total (Only Items)
+    document.getElementById('cartTotal').innerText = itemTotal;
+
+    // Update Step 2 Bill Summary (Items + Delivery)
+    if(document.getElementById('dispItemTotal')) document.getElementById('dispItemTotal').innerText = itemTotal;
+    if(document.getElementById('dispDeliveryFee')) document.getElementById('dispDeliveryFee').innerText = selectedCharge;
+    if(document.getElementById('dispGrandTotal')) document.getElementById('dispGrandTotal').innerText = grandTotal;
+
+    // Update Final Button
+    document.getElementById('finalTotal').innerText = grandTotal;
 }
 
 // --- BUDGET LOGIC ---
@@ -409,9 +430,9 @@ function selectBudget(type) {
 }
 function highlightBudget(t) { selectBudget(t); }
 
-// --- TIME LOGIC (FIXED: Default syncs with UI) ---
+// --- TIME LOGIC ---
 function selectTime(time) {
-    updateTimeUI(time, true); // True means show toast on manual click
+    updateTimeUI(time, true); 
 }
 
 function selectManualTime(timeStr) {
@@ -423,21 +444,15 @@ function selectManualTime(timeStr) {
 
 function updateTimeUI(displayTime, showNotification = true) {
     selectedTime = displayTime;
-    
-    // Reset Chips Selection Visuals
     document.querySelectorAll('.time-chip').forEach(c => c.classList.remove('selected'));
-    
-    // If it matches a chip, highlight it
+
     const chip = document.getElementById(`time_${displayTime}`);
     if(chip) chip.classList.add('selected');
 
-    // Update Display Text and Style
     const dispEl = document.getElementById('timeDisplay');
     dispEl.innerText = displayTime;
-    
-    // Style update to show it's active
     dispEl.className = "text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded border border-amber-200";
-    
+
     if(showNotification) showToast(`Time set to ${displayTime}`);
 }
 
@@ -454,14 +469,15 @@ async function placeOrder() {
     if(!selectedAddress) return showToast("Select Location");
 
     const cart = getCart();
-    
-    // Handle Magic Box
+
+    // Magic Box
     const magicNote = document.getElementById('magicBoxInput').value.trim();
     if(magicNote) {
         cart.push({
             name: magicNote,
             qty: "Special Request",
-            count: 1
+            count: 1,
+            price: 0 // Notes have 0 price
         });
     }
 
@@ -478,14 +494,26 @@ async function placeOrder() {
     let shopName = session.name + "'s Store";
     try { const uSnap = await db.ref('users/' + session.mobile + '/shopName').once('value'); if(uSnap.exists()) shopName = uSnap.val(); } catch(e) {}
 
+    // Calculate Final Amounts for Order Data
+    let itemTotal = 0;
+    cart.forEach(i => itemTotal += (parseFloat(i.price)||0) * (i.count||1));
+    const finalAmount = itemTotal + selectedCharge;
+
     const orderData = {
         orderId: 'ORD-' + Date.now().toString().slice(-6),
         user: { name: session.name, mobile: session.mobile, shopName: shopName },
         location: { address: selectedAddress.text, lat: selectedAddress.lat, lng: selectedAddress.lng, title: selectedAddress.title },
         cart: cart,
-        payment: { deliveryFee: selectedCharge, slab: selectedLabel, surcharge: 0, mode: 'COD' },
-        preferences: { budget: budgetFinal, deliveryTime: selectedTime }, // Now sends 'Evening' correctly
+        payment: { 
+            itemTotal: itemTotal,
+            deliveryFee: selectedCharge, 
+            grandTotal: finalAmount,
+            slab: selectedLabel, 
+            mode: 'COD' 
+        },
+        preferences: { budget: budgetFinal, deliveryTime: selectedTime },
         status: 'placed',
+        totalAmount: finalAmount, // For easy fetching
         timestamp: firebase.database.ServerValue.TIMESTAMP
     };
 
@@ -506,5 +534,3 @@ function showToast(msg) {
     t.classList.remove('opacity-0', 'pointer-events-none');
     setTimeout(() => t.classList.add('opacity-0', 'pointer-events-none'), 2500);
 }
-
-
