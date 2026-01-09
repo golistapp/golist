@@ -102,7 +102,7 @@ function setupHeader() {
 
 function setupSideMenu() {
     const nav = document.getElementById('sidebarNav');
-    // UPDATED MENU STRUCTURE
+    // RESTORED FULL MENU STRUCTURE
     let html = `
         <button onclick="toggleMenu(); openAddModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-plus text-golist w-5 text-lg"></i> Add Product
@@ -283,13 +283,34 @@ function loadRecentOrders() {
     });
 }
 
+// FIXED REPEAT LOGIC (OVERWRITE INSTEAD OF ADD)
 function repeatLastOrder() {
     if(!window.lastOrderItems || window.lastOrderItems.length === 0) return;
-    window.lastOrderItems.forEach(item => {
-        const qtyToAdd = item.count || 1;
-        updateCart(item.name, item.qty, item.price, qtyToAdd);
+
+    let cart = getCart(); 
+
+    window.lastOrderItems.forEach(lastItem => {
+        const existingIdx = cart.findIndex(c => c.name === lastItem.name);
+
+        if (existingIdx > -1) {
+            // SET exact quantity from last order (Don't Add)
+            cart[existingIdx].count = lastItem.count || 1;
+        } else {
+            // Add new if not exists
+            cart.push({
+                name: lastItem.name,
+                qty: lastItem.qty,
+                price: lastItem.price,
+                count: lastItem.count || 1
+            });
+        }
     });
-    showToast("All items added to cart!");
+
+    localStorage.setItem('rmz_cart', JSON.stringify(cart));
+    filterProducts();
+    updateBottomBar();
+
+    showToast("Cart restored from last order!");
     const bar = document.getElementById('bottomBar');
     if(bar) bar.classList.add('animate-bounce');
     setTimeout(() => { if(bar) bar.classList.remove('animate-bounce'); }, 1000);

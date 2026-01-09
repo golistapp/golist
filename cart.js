@@ -151,10 +151,17 @@ function renderCart() {
                 <p class="text-[10px] text-slate-400 font-bold uppercase mt-0.5">${item.qty} • ₹${itemPrice} x ${itemCount}</p>
                 <p class="text-xs font-bold text-golist mt-0.5">₹${itemTotal}</p>
             </div>
-            <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-1 border border-slate-200">
-                <button onclick="updateQty(${idx}, -1)" class="qty-btn bg-white text-slate-600 shadow-sm hover:text-red-500"><i class="fa-solid fa-minus text-[10px]"></i></button>
-                <span class="text-xs font-bold text-slate-800 w-4 text-center">${itemCount}</span>
-                <button onclick="updateQty(${idx}, 1)" class="qty-btn bg-slate-800 text-white shadow-md hover:bg-black"><i class="fa-solid fa-plus text-[10px]"></i></button>
+
+            <div class="flex items-center gap-3">
+                <button onclick="removeItem(${idx})" class="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition border border-transparent hover:border-red-100">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+
+                <div class="flex items-center gap-3 bg-slate-50 rounded-lg p-1 border border-slate-200">
+                    <button onclick="updateQty(${idx}, -1)" class="qty-btn bg-white text-slate-600 shadow-sm hover:text-red-500"><i class="fa-solid fa-minus text-[10px]"></i></button>
+                    <span class="text-xs font-bold text-slate-800 w-4 text-center">${itemCount}</span>
+                    <button onclick="updateQty(${idx}, 1)" class="qty-btn bg-slate-800 text-white shadow-md hover:bg-black"><i class="fa-solid fa-plus text-[10px]"></i></button>
+                </div>
             </div>
         `;
         list.appendChild(div);
@@ -171,6 +178,7 @@ function updateQty(idx, change) {
     const newCount = item.count + change;
 
     if (newCount < 1) {
+        // Fallback if they click minus on 1
         if(confirm(`Remove ${item.name}?`)) cart.splice(idx, 1);
         else return;
     } else {
@@ -178,6 +186,17 @@ function updateQty(idx, change) {
     }
     saveCart(cart);
     renderCart();
+}
+
+function removeItem(idx) {
+    const cart = getCart();
+    // Direct delete button logic
+    if(confirm(`Remove ${cart[idx].name} from cart?`)) {
+        cart.splice(idx, 1);
+        saveCart(cart);
+        renderCart();
+        showToast("Item removed");
+    }
 }
 
 // --- SMART LOCATION LOGIC ---
