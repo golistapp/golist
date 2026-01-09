@@ -71,23 +71,7 @@ function toggleMenu() {
     document.getElementById('menuOverlay').classList.toggle('open'); 
 }
 
-// Auto Emoji Logic (Fallback)
-function getEmoji(name) {
-    if (!name) return '📦';
-    const n = name.toLowerCase();
-    const map = {
-        'potato': '🥔', 'aloo': '🥔', 'onion': '🧅', 'pyaz': '🧅',
-        'tomato': '🍅', 'tamatar': '🍅', 'milk': '🥛', 'doodh': '🥛', 
-        'bread': '🍞', 'egg': '🥚', 'banana': '🍌', 'kela': '🍌', 
-        'apple': '🍎', 'seb': '🍎', 'rice': '🍚', 'chawal': '🍚',
-        'oil': '🛢️', 'soap': '🧼', 'shampoo': '🧴', 'surf': '🧺',
-        'biscuit': '🍪', 'chips': '🍟', 'chocolate': '🍫',
-        'curd': '🥣', 'dahi': '🥣', 'paneer': '🧀', 'butter': '🧈',
-        'veg': '🥦', 'fruit': '🍎'
-    };
-    for (const key in map) if (n.includes(key)) return map[key];
-    return '📦';
-}
+// (Old getEmoji Function Removed - Now using getProductIcon from home-icons.js)
 
 // --- 1. SETUP & MENU ---
 function setupHeader() {
@@ -102,7 +86,6 @@ function setupHeader() {
 
 function setupSideMenu() {
     const nav = document.getElementById('sidebarNav');
-    // RESTORED FULL MENU STRUCTURE
     let html = `
         <button onclick="toggleMenu(); openAddModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-plus text-golist w-5 text-lg"></i> Add Product
@@ -257,7 +240,8 @@ function loadRecentOrders() {
             if(masterMatch && masterMatch.image) {
                  imageHtml = `<img src="${masterMatch.image}" class="w-full h-full object-cover rounded-full">`;
             } else {
-                 imageHtml = getEmoji(item.name);
+                 // UPDATED: Using New Icon System
+                 imageHtml = window.getProductIcon ? window.getProductIcon(item.name) : '📦';
             }
 
             const div = document.createElement('div');
@@ -283,7 +267,7 @@ function loadRecentOrders() {
     });
 }
 
-// FIXED REPEAT LOGIC (OVERWRITE INSTEAD OF ADD)
+// REPEAT ORDER FIX (Overwrite Mode)
 function repeatLastOrder() {
     if(!window.lastOrderItems || window.lastOrderItems.length === 0) return;
 
@@ -293,10 +277,8 @@ function repeatLastOrder() {
         const existingIdx = cart.findIndex(c => c.name === lastItem.name);
 
         if (existingIdx > -1) {
-            // SET exact quantity from last order (Don't Add)
             cart[existingIdx].count = lastItem.count || 1;
         } else {
-            // Add new if not exists
             cart.push({
                 name: lastItem.name,
                 qty: lastItem.qty,
@@ -370,7 +352,8 @@ function renderList(products) {
         if(masterMatch && masterMatch.image) {
             imageContent = `<img src="${masterMatch.image}" class="w-full h-full object-cover">`;
         } else {
-            imageContent = getEmoji(item.name);
+            // UPDATED: Using New Icon System
+            imageContent = window.getProductIcon ? window.getProductIcon(item.name) : '📦';
         }
 
         const li = document.createElement('li');
@@ -520,4 +503,3 @@ window.toggleMenu = toggleMenu;
 window.logout = logout;
 window.openSupportOptions = openSupportOptions; 
 window.setupSideMenu = setupSideMenu; 
-// openAddressModal etc. will be exported from home-features.js
