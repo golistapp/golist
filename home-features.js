@@ -1,293 +1,52 @@
 // --- FILE: home-features.js ---
-// Contains: Tracking, Owner Tools, History, Support, Settings, Add Stock Logic
+// Contains: Tracking, Owner Tools, History, Support, Settings, Add Stock Logic, Invoice System, AND New Features (Address, PIN, Content)
 
-// --- GLOBAL VARIABLES FOR FEATURES ---
+// --- GLOBAL VARIABLES ---
 let activeTrackingOrder = null;
-let historyData = {};
-let selectedQtyValue = ''; // NEW: Stores selected quantity button value
+window.cachedHistoryOrders = {}; 
+let cachedMasterProducts = []; 
+let selectedMasterItem = null; 
+let currentGramValue = 1000;   
 
-// --- TRACKING & BANNER LOGIC ---
+// ==========================================
+// 1. ADD / EDIT ITEM MODAL LOGIC 
+// ==========================================
 
-function checkActiveOrderHome() {
-    const savedOrder = JSON.parse(localStorage.getItem('rmz_active_order'));
-
-    // 1. Check: Kya Local data exist karta hai?
-    // 2. Check: Kya ye order abhi login kiye hue user (session.mobile) ka hi hai?
-    if (savedOrder && session && savedOrder.user && savedOrder.user.mobile === session.mobile) {
-
-        // Active Status Check (Date check hata diya hai taaki purane active orders bhi dikhein)
-        const activeStatuses = ['placed', 'accepted', 'out_for_delivery', 'admin_accepted'];
-
-        if (activeStatuses.includes(savedOrder.status)) {
-            activateBanner(savedOrder);
-            return; // Local data sahi hai, yahi use karo
-        } else {
-            // Agar delivered/cancelled hai toh Local Storage clear karo
-            localStorage.removeItem('rmz_active_order');
-        }
-    } else {
-        // Agar user match nahi hua (dusra device/user) toh Local Storage clear karo
-        localStorage.removeItem('rmz_active_order');
-    }
-
-    // Local Storage mein kuch nahi mila ya galat tha, ab Cloud (Database) check karo
-    fetchActiveOrderFromCloud();
-}
-
-function fetchActiveOrderFromCloud() {
-    // Safety Check: Agar session nahi hai toh return karo
-    if(!session || !session.mobile) return;
-
-    // Database se last order fetch karo
-    db.ref('orders').orderByChild('user/mobile').equalTo(session.mobile).limitToLast(1).once('value', snap => {
-        if(snap.exists()) {
-            const data = snap.val();
-            const orderId = Object.keys(data)[0];
-            const order = data[orderId];
-
-            // Timestamp fix
-            let ts = order.timestamp; 
-            if(typeof ts === 'object' || !ts) ts = Date.now();
-
-            // ACTIVE ORDER LOGIC:
-            const activeStatuses = ['placed', 'accepted', 'out_for_delivery', 'admin_accepted'];
-
-            if (activeStatuses.includes(order.status)) {
-                const fullOrder = { id: orderId, ...order, timestamp: ts };
-
-                // 1. Banner dikhao
-                activateBanner(fullOrder);
-
-                // 2. Local Storage mein save kar lo taaki agli baar fast khule (Hybrid approach)
-                localStorage.setItem('rmz_active_order', JSON.stringify(fullOrder));
-            }
-        }
-    });
-}
-
-function activateBanner(order) {
-    activeTrackingOrder = order;
-    const banner = document.getElementById('liveOrderBanner');
-    if(banner) banner.classList.remove('hidden');
-    syncHomeOrderStatus(order.id);
-}
-
-function syncHomeOrderStatus(orderId) {
-    db.ref('orders/' + orderId).on('value', snap => {
-        if(snap.exists()) {
-            const updatedOrder = snap.val();
-            activeTrackingOrder = { id: orderId, ...updatedOrder };
-
-            // Keep local storage updated
-            localStorage.setItem('rmz_active_order', JSON.stringify(activeTrackingOrder));
-
-            updateBannerText(updatedOrder.status);
-
-            // Update Modal if open
-            if(!document.getElementById('trackingModal').classList.contains('hidden')) {
-                renderTrackingModalUI(activeTrackingOrder);
-            }
-        } else {
-            // Order Deleted (Cancelled by Admin/User)
-            localStorage.removeItem('rmz_active_order');
-            activeTrackingOrder = null;
-            document.getElementById('liveOrderBanner').classList.add('hidden');
-            document.getElementById('trackingModal').classList.add('hidden');
-        }
-    });
-}
-
-function updateBannerText(status) {
-    const statusEl = document.getElementById('bannerStatus');
-    let text = "Processing...";
-
-    // Map status codes to readable text
-    if(status === 'placed') text = "Waiting for Confirmation";
-    else if(status === 'accepted') text = "Partner Assigned";
-    else if(status === 'out_for_delivery') text = "Out for Delivery";
-    else if(status === 'delivered') text = "Delivered";
-
-    if(statusEl) statusEl.innerText = text;
-}
-
-// --- TRACKING MODAL LOGIC ---
-function openTrackingModal() {
-    if(!activeTrackingOrder) return;
-    document.getElementById('trackingModal').classList.remove('hidden');
-    renderTrackingModalUI(activeTrackingOrder);
-}
-
-function closeTrackingModal() {
-    document.getElementById('trackingModal').classList.add('hidden');
-}
-
-function renderTrackingModalUI(order) {
-    document.getElementById('modalOrderId').innerText = order.orderId ? order.orderId.slice(-6) : '...';
-    document.getElementById('modalTotal').innerText = order.payment.deliveryFee;
-
-    // 1. Render Timeline
-    const steps = ['placed', 'accepted', 'out_for_delivery', 'delivered'];
-    const labels = { 
-        placed: 'Order Placed', 
-        accepted: 'Partner Assigned', 
-        out_for_delivery: 'Out for Delivery', 
-        delivered: 'Delivered' 
-    };
-    const timelineContainer = document.getElementById('modalTimeline');
-    timelineContainer.innerHTML = '';
-
-    let passed = true;
-    let currentStep = order.status;
-    if(currentStep === 'admin_accepted') currentStep = 'placed'; 
-
-    steps.forEach(step => {
-        let isActive = passed;
-        if(step === currentStep) passed = false;
-
-        timelineContainer.innerHTML += `
-            <div class="modal-timeline-item ${isActive ? 'active' : ''}">
-                <div class="modal-timeline-dot"></div>
-                <h4 class="text-xs font-bold ${isActive ? 'text-slate-800' : 'text-slate-400'}">${labels[step]}</h4>
-            </div>
-        `;
-    });
-
-    // 2. Dynamic Actions Area (Cancel/Edit OR Partner Info)
-    const pCard = document.getElementById('modalPartnerCard');
-    const actionsContainer = document.getElementById('modalFooterActions');
-
-    // Show Edit/Cancel only if status is 'placed' (not accepted yet)
-    if(order.status === 'placed' || order.status === 'admin_accepted') {
-        pCard.classList.add('hidden');
-
-        actionsContainer.innerHTML = `
-            <div class="flex gap-3">
-                <button onclick="cancelOrder()" class="flex-1 py-3 bg-red-50 text-red-500 rounded-xl text-xs font-bold hover:bg-red-100 border border-red-100 transition">CANCEL ORDER</button>
-                <button onclick="editOrder()" class="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl text-xs font-bold hover:bg-indigo-100 border border-indigo-100 transition">EDIT / ADD ITEMS</button>
-            </div>
-            <p class="text-[9px] text-center text-slate-400 mt-2">You can edit until a partner accepts.</p>
-        `;
-    } else {
-        // Partner Assigned -> Show Partner Card & Support
-        if(order.deliveryBoyName) {
-            pCard.classList.remove('hidden');
-            document.getElementById('modalPartnerName').innerText = `${order.deliveryBoyName} (${order.deliveryBoyMobile})`;
-            document.getElementById('btnCallPartner').href = `tel:${order.deliveryBoyMobile}`;
-            document.getElementById('btnChatPartner').href = `https://wa.me/91${order.deliveryBoyMobile}`;
-        } else {
-            // Accepted but no name yet
-            pCard.classList.add('hidden');
-        }
-
-        actionsContainer.innerHTML = `
-            <p class="text-[10px] text-center text-slate-400 mb-3 font-bold uppercase">Need help?</p>
-            <button onclick="openSupportOptions()" class="w-full py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 transition">CONTACT SUPPORT</button>
-        `;
-    }
-
-    // 3. Items List
-    const itemsContainer = document.getElementById('modalItemsList');
-    itemsContainer.innerHTML = '';
-    if(order.cart) {
-        order.cart.forEach(item => {
-            itemsContainer.innerHTML += `
-                <div class="flex justify-between border-b border-slate-50 last:border-0 py-1">
-                    <span>${item.name} <span class="text-slate-400 text-[10px]">(${item.qty})</span></span>
-                    <span class="font-bold text-slate-700">x${item.count}</span>
-                </div>
-            `;
-        });
-    }
-}
-
-function cancelOrder() {
-    if(!activeTrackingOrder) return;
-    if(confirm("Are you sure you want to Cancel this order?")) {
-        db.ref('orders/' + activeTrackingOrder.id).remove()
-        .then(() => {
-            showToast("Order Cancelled");
-            localStorage.removeItem('rmz_active_order');
-            activeTrackingOrder = null;
-            document.getElementById('trackingModal').classList.add('hidden');
-            document.getElementById('liveOrderBanner').classList.add('hidden');
-        })
-        .catch(e => showToast("Error cancelling"));
-    }
-}
-
-function editOrder() {
-    if(!activeTrackingOrder) return;
-    if(confirm("To edit, we will cancel this order and add items back to your cart. Continue?")) {
-        // 1. Restore items to cart
-        localStorage.setItem('rmz_cart', JSON.stringify(activeTrackingOrder.cart));
-        updateCartBadge();
-
-        // 2. Delete current order
-        db.ref('orders/' + activeTrackingOrder.id).remove()
-        .then(() => {
-            localStorage.removeItem('rmz_active_order');
-            window.location.href = 'cart.html';
-        });
-    }
-}
-
-// --- SLIDER LOGIC REMOVED ---
-
-// --- ADD/EDIT STOCK MODAL (UPDATED) ---
-function openAddModal(id = null, name = '', qty = '') {
-    // UI Cleanup
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('menuOverlay').classList.remove('open');
-
+function openAddModal(id = null, name = '', qty = '', price = '', cat = '', unit = '') {
     const modal = document.getElementById('addStockModal');
     const card = document.getElementById('addStockCard');
-    const nameInput = document.getElementById('inpProdName');
-    const qtyInput = document.getElementById('inpProdQty');
 
-    // Clear Inputs & Suggestions
-    document.getElementById('suggestionBox').innerHTML = '';
+    resetModalUI();
+    populateModalDropdowns(cat, unit);
+    window.editItemId = id; 
 
-    // Reset Buttons
-    document.querySelectorAll('.qty-chip').forEach(b => {
-        b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600', 'text-white');
-        if(b.innerText === 'Custom') b.classList.add('bg-indigo-50', 'text-indigo-600');
-        else b.classList.add('bg-white', 'text-slate-500', 'border-slate-100');
-    });
+    if (id) {
+        // Edit Mode
+        const isMaster = window.masterProductsList.find(p => p.name.toLowerCase() === name.toLowerCase());
+
+        if (isMaster) {
+            selectMasterProduct(isMaster, true); 
+            parseAndSetQuantity(qty, isMaster);
+        } else {
+            // Custom Item
+            document.getElementById('inpProdName').value = name;
+            const priceInp = document.getElementById('inpProdPrice');
+            if(price === 'Market Price' || isNaN(parseFloat(price))) {
+                priceInp.value = 'Market Price';
+            } else {
+                priceInp.value = price;
+            }
+            document.getElementById('inpProdUnit').value = unit || 'kg';
+            parseAndSetQuantityManual(qty, unit);
+        }
+    } else {
+        // Add Mode
+        document.getElementById('inpProdName').focus();
+        loadMasterProductsForSearch();
+    }
 
     modal.classList.remove('hidden');
     setTimeout(() => card.classList.remove('translate-y-full'), 10);
-
-    if(id) {
-        // EDIT MODE
-        editItemId = id; 
-        nameInput.value = name;
-        qtyInput.value = qty;
-
-        // Try to highlight if it matches a preset
-        let matched = false;
-        document.querySelectorAll('.qty-chip').forEach(btn => {
-            // Simple match logic
-            if(qty.toLowerCase().includes(btn.innerText.toLowerCase().replace('pkt','packet').replace('pc','piece'))) {
-               // Highlight logic here if needed, but for now just showing value in input is enough
-            }
-        });
-    } else {
-        // ADD NEW MODE
-        editItemId = null;
-        nameInput.value = '';
-        qtyInput.value = ''; 
-        selectedQtyValue = '';
-
-        // Auto Focus Name
-        setTimeout(() => nameInput.focus(), 100);
-        showSmartSuggestions();
-    }
-
-    // Attach Listener
-    nameInput.oninput = function() {
-        if(this.value.length > 0) searchMasterProduct(this.value);
-        else showSmartSuggestions();
-    };
 }
 
 function closeAddModal() {
@@ -295,355 +54,781 @@ function closeAddModal() {
     card.classList.add('translate-y-full');
     setTimeout(() => {
         document.getElementById('addStockModal').classList.add('hidden');
-        document.getElementById('inpProdName').blur();
+        window.editItemId = null; 
+        resetModalUI();
     }, 300);
 }
 
-// --- SMART SUGGESTIONS ---
-function showSmartSuggestions() {
-    const box = document.getElementById('suggestionBox');
-    box.innerHTML = ''; 
+function resetModalUI() {
+    selectedMasterItem = null;
+    currentGramValue = 1000; 
 
-    db.ref('masterProducts').once('value', snap => {
-        if(!snap.exists()) return;
-        const allMaster = Object.values(snap.val());
-        // allProducts comes from home-core.js (loaded local cache)
-        const userItemNames = (typeof allProducts !== 'undefined') ? allProducts.map(p => p[1].name.toLowerCase()) : [];
+    const els = ['inpProdName', 'inpProdCat', 'inpProdUnit', 'inpProdPrice'];
+    els.forEach(id => document.getElementById(id).classList.remove('locked-input'));
 
-        const notAdded = allMaster.filter(m => !userItemNames.includes(m.name.toLowerCase()));
+    document.getElementById('inpProdName').value = '';
+    document.getElementById('inpProdPrice').value = 'Market Price';
+    document.getElementById('inpProdQtyDisplay').value = '1 Kg'; 
+    document.getElementById('masterProductBadge').classList.add('hidden');
+    document.getElementById('suggestionBox').innerHTML = '';
+}
 
-        const suggestions = [];
-        for(let i=0; i<3 && notAdded.length > 0; i++) {
-            const rIndex = Math.floor(Math.random() * notAdded.length);
-            suggestions.push(notAdded[rIndex].name);
-            notAdded.splice(rIndex, 1); 
+function populateModalDropdowns(selectedCat, selectedUnit) {
+    const catSelect = document.getElementById('inpProdCat');
+    const unitSelect = document.getElementById('inpProdUnit');
+
+    catSelect.innerHTML = '<option value="" disabled selected>Category</option>';
+
+    if (window.masterCategories) {
+        Object.entries(window.masterCategories)
+            .sort(([,a], [,b]) => (a.order || 9999) - (b.order || 9999)) 
+            .forEach(([key, val]) => {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.innerText = val.name;
+                if(key === selectedCat) opt.selected = true;
+                catSelect.appendChild(opt);
+            });
+    }
+
+    unitSelect.innerHTML = '';
+    if (window.masterUnits) {
+        Object.entries(window.masterUnits).forEach(([key, val]) => {
+            const opt = document.createElement('option');
+            opt.value = key; 
+            opt.innerText = val.name; 
+            if(key === selectedUnit) opt.selected = true;
+            unitSelect.appendChild(opt);
+        });
+    }
+}
+
+// ==========================================
+// 2. LOGIC: PARSING & UNIT HANDLING
+// ==========================================
+
+document.getElementById('inpProdUnit').addEventListener('change', function() {
+    const newUnitId = this.value;
+    const unitName = getUnitNameById(newUnitId).toLowerCase();
+
+    if(unitName.includes('gram') || unitName.includes('gm')) {
+        currentGramValue = 50; 
+    } else if(isWeightUnit(unitName)) {
+        currentGramValue = 1000; 
+    } else {
+        currentGramValue = 1; 
+    }
+    updateQuantityDisplay();
+});
+
+function getUnitNameById(unitId) {
+    if (!window.masterUnits || !window.masterUnits[unitId]) return 'Unit';
+    return window.masterUnits[unitId].name; 
+}
+
+function isWeightUnit(unitName) {
+    const n = unitName.toLowerCase();
+    return n.includes('kg') || n.includes('litre') || n.includes('liter') || n.includes('gm') || n.includes('ml') || n.includes('gram');
+}
+
+function parseAndSetQuantity(qtyString, masterItem) {
+    const unitName = getUnitNameById(masterItem.unit);
+    parseLogic(qtyString, unitName);
+}
+
+function parseAndSetQuantityManual(qtyString, unitId) {
+    const unitName = getUnitNameById(unitId);
+    parseLogic(qtyString, unitName);
+}
+
+function parseLogic(qtyString, unitName) {
+    const isWt = isWeightUnit(unitName);
+    const numMatch = qtyString.match(/(\d+(\.\d+)?)/);
+    let val = numMatch ? parseFloat(numMatch[0]) : 1;
+    const str = qtyString.toLowerCase();
+
+    if (isWt) {
+        if (str.includes('kg') || str.includes('litre') || str.includes('liter')) {
+            currentGramValue = val * 1000;
+        } else if (str.includes('gm') || str.includes('ml') || str.includes('gram')) {
+            currentGramValue = val;
+        } else {
+            currentGramValue = 1000; 
         }
-        renderSuggestions(suggestions, box);
+    } else {
+        currentGramValue = val; 
+    }
+    updateQuantityDisplay();
+}
+
+// ==========================================
+// 3. SMART SEARCH & SELECTION LOGIC
+// ==========================================
+
+function loadMasterProductsForSearch() {
+    if(cachedMasterProducts.length > 0) { renderSuggestions(); return; }
+    db.ref('masterProducts').limitToLast(100).once('value', snap => {
+        if(snap.exists()) {
+            cachedMasterProducts = Object.values(snap.val());
+            renderSuggestions();
+        }
     });
 }
 
-function searchMasterProduct(query) {
+function renderSuggestions() {
     const box = document.getElementById('suggestionBox');
     box.innerHTML = '';
-    if(!query || query.length < 2) return;
-
-    db.ref('masterProducts').once('value', snap => {
-        if(!snap.exists()) return;
-        const matches = [];
-        Object.values(snap.val()).forEach(item => {
-            if(item.name.toLowerCase().includes(query.toLowerCase())) matches.push(item.name);
-        });
-        renderSuggestions(matches.slice(0, 3), box);
-    });
+    const existingNames = (window.allProducts || []).map(p => p.name.toLowerCase());
+    const suggestions = cachedMasterProducts
+        .filter(p => !existingNames.includes(p.name.toLowerCase()))
+        .sort(() => 0.5 - Math.random())
+        .slice(0, 5);
+    suggestions.forEach(prod => createChip(prod, box));
 }
 
-function renderSuggestions(list, container) {
-    list.forEach(name => {
-        const span = document.createElement('span');
-        span.className = "bg-blue-50 text-blue-600 px-3 py-1.5 rounded-full text-xs font-bold cursor-pointer border border-blue-100 hover:bg-blue-600 hover:text-white transition animate-[popIn_0.2s_ease-out]";
-        span.innerText = "+ " + name;
-        span.onclick = () => {
-            document.getElementById('inpProdName').value = name;
-        };
-        container.appendChild(span);
-    });
+document.getElementById('inpProdName').addEventListener('input', function(e) {
+    const query = e.target.value.toLowerCase();
+    const box = document.getElementById('suggestionBox');
+    box.innerHTML = '';
+    if(query.length < 2) return;
+
+    const existingNames = (window.allProducts || []).map(p => p.name.toLowerCase());
+    const matches = cachedMasterProducts
+        .filter(p => p.name.toLowerCase().includes(query) && !existingNames.includes(p.name.toLowerCase()))
+        .slice(0, 4);
+    matches.forEach(prod => createChip(prod, box));
+});
+
+function createChip(prod, container) {
+    const btn = document.createElement('button');
+    btn.className = "px-3 py-1 rounded-full bg-slate-50 text-slate-500 text-[10px] font-bold border border-slate-100 hover:bg-golist hover:text-white hover:border-transparent transition whitespace-nowrap";
+    btn.innerHTML = `+ ${prod.name}`;
+    btn.onclick = () => selectMasterProduct(prod);
+    container.appendChild(btn);
 }
 
-// --- QUANTITY LOGIC (Presets + Custom + Buttons) ---
+function selectMasterProduct(prod, isEditing = false) {
+    if (!isEditing) {
+        const existing = window.allProducts.find(p => p.name.toLowerCase() === prod.name.toLowerCase());
+        if(existing) { showToast("Item already in list!"); return; }
+    }
 
-function setQtyPreset(val, btn) {
-    selectedQtyValue = val;
-    const input = document.getElementById('inpProdQty');
-    input.value = val;
+    selectedMasterItem = prod;
 
-    // Reset Visuals
-    document.querySelectorAll('.qty-chip').forEach(b => {
-        b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600');
-        if(b.innerText === 'Custom') b.classList.add('bg-indigo-50', 'text-indigo-600');
-        else b.classList.add('bg-white', 'text-slate-500', 'border-slate-100');
-    });
+    const nameInp = document.getElementById('inpProdName');
+    const catInp = document.getElementById('inpProdCat');
+    const unitInp = document.getElementById('inpProdUnit');
+    const priceInp = document.getElementById('inpProdPrice');
 
-    // Highlight Clicked
-    btn.classList.remove('bg-white', 'text-slate-500', 'border-slate-100');
-    btn.classList.add('bg-slate-900', 'text-white');
+    nameInp.value = prod.name;
+    if(prod.category) catInp.value = prod.category;
+    if(prod.unit) unitInp.value = prod.unit; 
+
+    nameInp.classList.add('locked-input');
+    catInp.classList.add('locked-input');
+    unitInp.classList.add('locked-input');
+    priceInp.classList.add('locked-input'); 
+
+    if (!isEditing) {
+        const unitName = getUnitNameById(prod.unit);
+        if (isWeightUnit(unitName)) currentGramValue = 1000;
+        else currentGramValue = 1;
+        updateQuantityDisplay();
+    }
+
+    document.getElementById('masterProductBadge').classList.remove('hidden');
+    document.getElementById('suggestionBox').innerHTML = '';
 }
 
-function toggleCustomQty(btn) {
-    selectedQtyValue = 'custom';
-    const input = document.getElementById('inpProdQty');
+// ==========================================
+// 4. QUANTITY & PRICE CALCULATION
+// ==========================================
 
-    // Reset Visuals
-    document.querySelectorAll('.qty-chip').forEach(b => {
-        b.classList.remove('bg-slate-900', 'text-white', 'bg-indigo-600');
-        b.classList.add('bg-white', 'text-slate-500', 'border-slate-100');
-    });
+function adjustModalQty(dir) {
+    let unitId = selectedMasterItem ? selectedMasterItem.unit : document.getElementById('inpProdUnit').value;
+    const unitName = getUnitNameById(unitId).toLowerCase();
+    const isWt = isWeightUnit(unitName);
 
-    // Highlight Custom
-    btn.classList.remove('bg-indigo-50', 'text-indigo-600', 'bg-white', 'text-slate-500');
-    btn.classList.add('bg-indigo-600', 'text-white');
+    if (isWt) {
+        let step = 50;
+        if(unitName.includes('gram') || unitName.includes('gm')) {
+            step = 25; 
+            currentGramValue += (dir * step);
+            if(currentGramValue < 25) currentGramValue = 25;
+        } else {
+            if (currentGramValue >= 1000) step = 250; 
+            if (dir === -1 && currentGramValue <= 1000) step = 50;
+            currentGramValue += (dir * step);
+            if (currentGramValue < 50) currentGramValue = 50; 
+        }
 
-    input.value = ''; 
-    input.focus();
+    } else {
+        currentGramValue += dir;
+        if (currentGramValue < 1) currentGramValue = 1;
+    }
+    updateQuantityDisplay();
 }
 
-function adjustQty(delta) {
-    const input = document.getElementById('inpProdQty');
-    let currentVal = input.value.trim();
+function updateQuantityDisplay() {
+    let unitId = selectedMasterItem ? selectedMasterItem.unit : document.getElementById('inpProdUnit').value;
+    if(!unitId) return;
 
-    if(!currentVal) {
-        input.value = delta > 0 ? "1 Unit" : "";
+    const unitName = getUnitNameById(unitId);
+    const isWt = isWeightUnit(unitName);
+
+    const displayInput = document.getElementById('inpProdQtyDisplay');
+    const priceInput = document.getElementById('inpProdPrice');
+
+    let basePrice = selectedMasterItem ? (parseFloat(selectedMasterItem.price) || 0) : 0;
+
+    let finalPrice = 0;
+    let displayText = "";
+
+    if (isWt) {
+        if (currentGramValue < 1000) {
+            const smallUnit = unitName.toLowerCase().includes('l') ? 'ml' : 'gm';
+            displayText = `${currentGramValue} ${smallUnit}`;
+        } else {
+            const mainVal = currentGramValue / 1000;
+            displayText = `${mainVal} ${unitName}`;
+        }
+
+        if(selectedMasterItem) finalPrice = (currentGramValue / 1000) * basePrice;
+
+    } else {
+        displayText = `${currentGramValue} ${unitName}`;
+        if(selectedMasterItem) finalPrice = currentGramValue * basePrice;
+    }
+
+    displayInput.value = displayText;
+
+    if(selectedMasterItem) {
+        priceInput.value = Math.round(finalPrice * 100) / 100;
+    }
+}
+
+function saveProduct() {
+    const name = document.getElementById('inpProdName').value.trim();
+    const catId = document.getElementById('inpProdCat').value;
+    const unitId = document.getElementById('inpProdUnit').value;
+    const price = document.getElementById('inpProdPrice').value;
+    const qtyText = document.getElementById('inpProdQtyDisplay').value.trim();
+
+    if(!name) return showToast("Enter Name");
+    if(!price) return showToast("Enter Price");
+    if(!catId) return showToast("Select Category");
+    if(!unitId) return showToast("Select Unit Category");
+
+    const productData = {
+        name: name,
+        price: price, 
+        category: catId,
+        unit: unitId, 
+        qty: qtyText, 
+        updatedAt: firebase.database.ServerValue.TIMESTAMP
+    };
+
+    const btn = document.querySelector('#addStockModal button[onclick="saveProduct()"]');
+    const originalText = btn.innerText;
+    btn.innerText = "SAVING...";
+    btn.disabled = true;
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    const targetMobile = urlParams.get('shop') || (session ? session.mobile : null);
+
+    if(!targetMobile) {
+        showToast("Error: Store ID not found!");
+        btn.innerText = originalText;
+        btn.disabled = false;
         return;
     }
 
-    const match = currentVal.match(/^(\d+(\.\d+)?)\s*(.*)$/);
-    if(match) {
-        let num = parseFloat(match[1]);
-        let unit = match[3] || ""; 
+    const editId = window.editItemId;
 
-        let step = 1;
-        if(unit.toLowerCase().includes('g') && !unit.toLowerCase().includes('kg')) step = 50; 
-        if(unit.toLowerCase().includes('ml')) step = 100;
-
-        let newNum = num + (delta * step);
-        if(newNum <= 0) newNum = 0; 
-
-        input.value = `${newNum} ${unit}`.trim();
+    if (editId) {
+        db.ref(`products/${targetMobile}/${editId}`).update(productData)
+        .then(() => finalizeSave("Item Updated!"));
     } else {
-        // Fallback for weird text
-        input.value = delta > 0 ? "1 " + currentVal : currentVal;
-    }
-}
-
-// --- SAVE PRODUCT ---
-function saveProduct() {
-    const name = document.getElementById('inpProdName').value.trim();
-    const qty = document.getElementById('inpProdQty').value.trim();
-
-    if(!name) return showToast("Enter Name");
-    if(!qty) return showToast("Enter Quantity");
-
-    if(editItemId) {
-        db.ref(`products/${targetMobile}/${editItemId}`).update({ name, qty })
-        .then(() => { showToast("Updated"); closeAddModal(); toggleEditMode(); });
-    } else {
-        db.ref(`products/${targetMobile}`).push({ name, qty, addedAt: firebase.database.ServerValue.TIMESTAMP })
-        .then(() => { showToast("Added"); closeAddModal(); });
-    }
-}
-
-// --- CUSTOM REQUEST ---
-function openCustomRequestModal() {
-    document.getElementById('customRequestModal').classList.remove('hidden');
-    document.getElementById('reqItemName').focus();
-}
-
-function closeCustomRequestModal() {
-    document.getElementById('customRequestModal').classList.add('hidden');
-    document.getElementById('reqItemName').value = '';
-}
-
-function addCustomItemToCart() {
-    const text = document.getElementById('reqItemName').value.trim();
-    if(!text) return showToast("Please write something");
-
-    addToCartLocal(text, "Special Request");
-    closeCustomRequestModal();
-}
-
-// --- HISTORY & INVOICE ---
-function openHistory() {
-    toggleMenu();
-    const list = document.getElementById('historyList');
-    list.innerHTML = '<div class="text-center p-4"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>';
-    document.getElementById('historyModal').classList.remove('hidden');
-
-    db.ref('orders').orderByChild('user/mobile').equalTo(targetMobile).once('value', s => {
-        list.innerHTML = '';
-        if(s.exists()) {
-            const all = Object.values(s.val()).reverse().filter(o => o.status === 'delivered');
-            if(all.length === 0) { list.innerHTML = '<div class="text-center p-8 text-slate-400">No delivered orders yet</div>'; return; }
-
-            all.forEach(o => {
-                historyData[o.orderId] = o;
-                const div = document.createElement('div');
-                div.className = "bg-white p-4 rounded-xl border border-slate-200 shadow-sm";
-                div.innerHTML = `
-                    <div class="flex justify-between items-start mb-2">
-                        <div>
-                            <h3 class="font-bold text-slate-800">Order #${o.orderId.slice(-6)}</h3>
-                            <p class="text-xs text-slate-500">${new Date(o.timestamp).toLocaleDateString()}</p>
-                        </div>
-                        <span class="bg-green-100 text-green-700 text-[10px] font-bold px-2 py-1 rounded">DELIVERED</span>
-                    </div>
-                    <div class="text-xs text-slate-500 mb-3">
-                        <p>Items: ${o.cart ? o.cart.length : 0}</p>
-                        <p>Fee: ₹${o.payment.deliveryFee}</p>
-                    </div>
-                    <button onclick="openInvoice('${o.orderId}')" class="w-full bg-slate-900 text-white text-xs font-bold py-2.5 rounded-lg">DOWNLOAD INVOICE</button>
-                `;
-                list.appendChild(div);
-            });
-        } else {
-            list.innerHTML = '<div class="text-center p-8 text-slate-400">No history found</div>';
-        }
-    });
-}
-
-function closeHistory() { document.getElementById('historyModal').classList.add('hidden'); }
-
-function openInvoice(oid) {
-    const o = historyData[oid];
-    if(!o) return;
-    document.getElementById('invName').innerText = o.user.name;
-    document.getElementById('invMobile').innerText = o.user.mobile;
-    document.getElementById('invAddr').innerText = o.location.address;
-    document.getElementById('invId').innerText = "#" + o.orderId.slice(-6);
-    document.getElementById('invDate').innerText = new Date(o.timestamp).toLocaleDateString();
-    document.getElementById('invFee').innerText = o.payment.deliveryFee;
-    document.getElementById('invTotal').innerText = o.payment.deliveryFee;
-    const tbody = document.getElementById('invItems');
-    tbody.innerHTML = '';
-    if(o.cart) { o.cart.forEach(i => { tbody.innerHTML += `<tr><td class="py-2 px-4 border-b border-slate-50"><p class="font-bold text-slate-800">${i.name}</p><p class="text-[10px] text-slate-400">${i.qty}</p></td><td class="py-2 px-4 border-b border-slate-50 text-right font-bold text-slate-700">x${i.count}</td></tr>`; }); }
-    document.getElementById('invoiceModal').classList.remove('hidden');
-}
-
-// --- VIDEO HELP ---
-function openVideoHelp() {
-    toggleMenu();
-    document.getElementById('videoHelpModal').classList.remove('hidden');
-    const container = document.getElementById('videoListContainer');
-    container.innerHTML = '<p class="text-center text-slate-400 text-xs py-8"><i class="fa-solid fa-spinner fa-spin"></i> Loading videos...</p>';
-
-    db.ref('admin/videos').once('value', snap => {
-        container.innerHTML = '';
-        if(snap.exists()) {
-            Object.values(snap.val()).forEach(vid => {
-                const videoId = vid.link.split('v=')[1] || vid.link.split('/').pop();
-                const thumb = `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
-
-                container.innerHTML += `
-                    <div onclick="window.open('${vid.link}', '_blank')" class="flex gap-3 bg-slate-50 p-2 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100">
-                        <div class="w-24 h-16 bg-black rounded-lg flex-shrink-0 overflow-hidden relative">
-                            <img src="${thumb}" class="w-full h-full object-cover opacity-80">
-                            <div class="absolute inset-0 flex items-center justify-center"><i class="fa-solid fa-play text-white text-lg drop-shadow-md"></i></div>
-                        </div>
-                        <div class="flex-1 py-1">
-                            <h4 class="text-sm font-bold text-slate-800 line-clamp-2 leading-tight">${vid.title}</h4>
-                            <p class="text-[10px] text-red-500 font-bold mt-1 uppercase">Watch Now</p>
-                        </div>
-                    </div>
-                `;
-            });
-        } else {
-            container.innerHTML = '<p class="text-center text-slate-400 text-xs py-8">No help videos found.</p>';
-        }
-    });
-}
-
-// --- POLICIES ---
-function openPolicies() {
-    toggleMenu();
-    document.getElementById('policyViewModal').classList.remove('hidden');
-    loadPolicy('privacy'); 
-}
-
-function loadPolicy(type) {
-    const contentArea = document.getElementById('policyContentArea');
-    contentArea.innerHTML = '<p class="text-center text-slate-400 mt-10">Loading...</p>';
-
-    db.ref('admin/policies/' + type).once('value', snap => {
-        if(snap.exists()) {
-            let text = snap.val();
-            if(!text.includes('<')) text = text.replace(/\n/g, '<br>');
-            contentArea.innerHTML = text;
-        } else {
-            contentArea.innerHTML = '<p class="text-center text-slate-400 mt-10">No content available.</p>';
-        }
-    });
-}
-
-// --- PROFILE & SETTINGS ---
-function loadProfile() { 
-    db.ref('users/'+targetMobile+'/logo').once('value', s => { 
-        if(s.exists()) document.getElementById('profileImg').src = s.val(); 
-    }); 
-}
-
-function uploadCompressedLogo() { 
-    if(!isOwner) return; 
-    const f = document.getElementById('logoInput').files[0]; 
-    if(f) { 
-        const r = new FileReader(); r.readAsDataURL(f); 
-        r.onload = e => { 
-            const i = new Image(); i.src = e.target.result; 
-            i.onload = () => { 
-                const c = document.createElement('canvas'); 
-                const x = c.getContext('2d'); const w = 300; const sc = w/i.width; 
-                c.width=w; c.height=i.height*sc; x.drawImage(i,0,0,c.width,c.height); 
-                const d = c.toDataURL('image/jpeg', 0.7); 
-                document.getElementById('profileImg').src=d; 
-                db.ref('users/'+targetMobile).update({logo:d}).then(()=>showToast("Logo Updated")); 
+        if(!selectedMasterItem) {
+            const existing = window.allProducts.find(p => p.name.toLowerCase() === name.toLowerCase());
+            if(existing) {
+                showToast("Item already exists!");
+                btn.innerText = originalText;
+                btn.disabled = false;
+                return;
             }
         }
+        productData.addedAt = firebase.database.ServerValue.TIMESTAMP;
+        db.ref(`products/${targetMobile}`).push(productData)
+        .then(() => finalizeSave("Item Added!"));
+    }
+
+    function finalizeSave(msg) {
+        showToast(msg);
+        closeAddModal();
+        btn.innerText = originalText;
+        btn.disabled = false;
     }
 }
 
-function openAddressModal() { toggleMenu(); document.getElementById('addressModal').classList.remove('hidden'); db.ref('users/'+targetMobile+'/address').once('value', s => { if(s.exists()) document.getElementById('updateAddrText').value = s.val(); }); }
-function closeAddressModal() { document.getElementById('addressModal').classList.add('hidden'); }
-function saveAddress() { const val = document.getElementById('updateAddrText').value; db.ref('users/'+targetMobile).update({address:val}).then(()=>{ showToast("Address Saved"); closeAddressModal(); }); }
-function changePin() { toggleMenu(); const p = prompt("New PIN:"); if(p && p.length===4) db.ref('users/'+targetMobile).update({pin:p}); }
-function changeShopName() { toggleMenu(); const n = prompt("Enter New Shop Name:"); if(n) db.ref('users/'+targetMobile).update({shopName: n}).then(()=>showToast("Shop Name Updated")); }
+// ==========================================
+// 5. HISTORY & INVOICE SYSTEM
+// ==========================================
 
-// --- BANNER SETTINGS ---
-function setBanColor(c) {
-    document.getElementById('selectedColor').value = c;
-    document.getElementById('banText').style.borderColor = c;
-}
+function openHistory() {
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    if(!session) return showToast("Please login first");
 
-function setBanTextColor(c) {
-    document.getElementById('selectedTextColor').value = c;
-    showToast("Text Color Selected");
-}
+    const modal = document.getElementById('historyModal');
+    const list = document.getElementById('historyList');
 
-function saveBannerSettings() {
-    const text = document.getElementById('banText').value;
-    const color = document.getElementById('selectedColor').value;
-    const textColor = document.getElementById('selectedTextColor').value;
-    const fontSize = document.getElementById('banFontSize').value;
-    const bold = document.getElementById('banBold').checked;
+    modal.classList.remove('hidden');
+    list.innerHTML = `
+        <div class="text-center mt-10 opacity-50">
+            <i class="fa-solid fa-spinner fa-spin text-4xl text-slate-300 mb-2"></i>
+            <p class="text-xs font-bold text-slate-400">Loading Orders...</p>
+        </div>`;
 
-    if(!text) return showToast("Enter Text");
-
-    db.ref(`users/${targetMobile}/banner`).set({text, color, textColor, fontSize, bold})
-    .then(() => {
-        showToast("Banner Updated");
-        document.getElementById('bannerModal').classList.add('hidden');
-        setTimeout(() => window.location.reload(), 1000);
-    });
-}
-
-// --- MISC ACTIONS ---
-// REPEAT ORDER REMOVED
-
-function openSupportOptions() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('menuOverlay').classList.remove('open');
-    document.getElementById('supportModal').classList.remove('hidden');
-}
-
-function sendSupportMsg(issueType) {
-    const waNumber = "7903698180";
     db.ref('orders').orderByChild('user/mobile').equalTo(session.mobile).once('value', snap => {
-        const totalOrders = snap.exists() ? Object.keys(snap.val()).length : 0;
-        const message = `*Ramazone Support Request*\n---------------------------\n*Name:* ${session.name}\n*Mobile:* ${session.mobile}\n*Total Orders:* ${totalOrders}\n---------------------------\n*Issue:* ${issueType}\n\nPlease assist me.`;
-        window.open(`https://wa.me/91${waNumber}?text=${encodeURIComponent(message)}`, '_blank');
-        document.getElementById('supportModal').classList.add('hidden');
+        if(!snap.exists()) {
+            list.innerHTML = `<div class="text-center mt-10 opacity-50"><i class="fa-solid fa-box-open text-4xl text-slate-300 mb-2"></i><p class="text-xs font-bold text-slate-400">No orders found</p></div>`;
+            return;
+        }
+
+        const orders = [];
+        snap.forEach(child => {
+            const ord = { id: child.key, ...child.val() };
+            orders.push(ord);
+            window.cachedHistoryOrders[child.key] = ord;
+        });
+
+        orders.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+        list.innerHTML = '';
+        orders.forEach(order => {
+            const date = new Date(order.timestamp).toLocaleDateString('en-IN', {
+                day: 'numeric', month: 'short', year: 'numeric'
+            });
+
+            const isDelivered = order.status === 'delivered';
+            const statusColor = isDelivered ? 'bg-green-100 text-golist' : 'bg-orange-50 text-orange-600';
+            const statusText = order.status === 'out_for_delivery' ? 'On Way' : order.status;
+            let totalAmount = order.totalAmount || (order.payment ? order.payment.deliveryFee : 0);
+            const itemCount = order.cart ? order.cart.length : 0;
+            const displayId = order.orderId ? order.orderId : `...${order.id.slice(-4)}`;
+
+            list.innerHTML += `
+                <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-4 animate-float">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h4 class="font-bold text-slate-800 text-sm">Order #${displayId}</h4>
+                            <p class="text-[10px] text-slate-400 font-bold">${date}</p>
+                        </div>
+                        <span class="${statusColor} px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">${statusText}</span>
+                    </div>
+                    <div class="flex justify-between items-center my-3 bg-slate-50 rounded-lg p-2 px-3">
+                        <div class="text-center">
+                            <p class="text-[9px] text-slate-400 uppercase font-bold">Items</p>
+                            <p class="font-bold text-slate-800 text-sm">${itemCount}</p>
+                        </div>
+                        <div class="w-px h-6 bg-slate-200"></div>
+                        <div class="text-center">
+                            <p class="text-[9px] text-slate-400 uppercase font-bold">Total</p>
+                            <p class="font-bold text-slate-800 text-sm">₹${totalAmount}</p>
+                        </div>
+                    </div>
+                    <button onclick="viewOrderInvoice('${order.id}')" class="w-full bg-slate-900 text-white font-bold py-2.5 rounded-lg text-xs hover:bg-black transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-eye"></i> View Order & Bill
+                    </button>
+                </div>
+            `;
+        });
     });
+}
+
+function viewOrderInvoice(orderId) {
+    const order = window.cachedHistoryOrders[orderId];
+    if(!order) return showToast("Order Data Missing");
+
+    const modal = document.getElementById('invoiceModal');
+
+    document.getElementById('invShopName').innerText = document.getElementById('headerShopName').innerText || "My Shop";
+    document.getElementById('invOrderId').innerText = order.orderId || `#${orderId.slice(-6).toUpperCase()}`;
+    document.getElementById('invDate').innerText = new Date(order.timestamp).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute:'2-digit'
+    });
+    document.getElementById('invCustName').innerText = order.user ? order.user.name : "Guest";
+    document.getElementById('invCustMobile').innerText = order.user ? `+91 ${order.user.mobile}` : "";
+
+    const listContainer = document.getElementById('invItemsList');
+    listContainer.innerHTML = '';
+
+    let subTotal = 0;
+    if(order.cart) {
+        order.cart.forEach(item => {
+            const itemTotal = (parseFloat(item.price) || 0) * (item.count || 1);
+            subTotal += itemTotal;
+            listContainer.innerHTML += `
+                <div class="flex justify-between items-center text-xs border-b border-slate-50 py-1.5 last:border-0">
+                    <div class="flex-1 font-medium text-slate-700">${item.name} <span class="text-[10px] text-slate-400">(${item.qty})</span></div>
+                    <div class="w-12 text-center text-slate-500">x${item.count}</div>
+                    <div class="w-16 text-right font-bold text-slate-800">₹${itemTotal}</div>
+                </div>`;
+        });
+    }
+
+    const delFee = order.payment ? (parseFloat(order.payment.deliveryFee) || 0) : 0;
+    const grandTotal = subTotal + delFee;
+
+    document.getElementById('invSubTotal').innerText = subTotal;
+    document.getElementById('invDelFee').innerText = delFee;
+    document.getElementById('invGrandTotal').innerText = grandTotal;
+
+    const partnerEl = document.getElementById('invPartnerName');
+    const invoiceActions = document.querySelector('#invoiceModal .grid');
+
+    let cancelBtn = document.getElementById('btnCancelOrder');
+    if(cancelBtn) cancelBtn.remove(); 
+
+    if(order.status === 'placed') {
+        partnerEl.innerText = "Waiting for Partner...";
+        partnerEl.className = "text-xs font-bold text-orange-500 animate-pulse";
+
+        const btnHtml = `
+            <button id="btnCancelOrder" onclick="cancelOrder('${orderId}')" class="col-span-2 w-full py-3 rounded-xl bg-red-50 text-red-600 font-bold text-xs border border-red-100 hover:bg-red-100 transition mt-2">
+                <i class="fa-solid fa-ban"></i> Cancel Order & Edit Cart
+            </button>`;
+        invoiceActions.insertAdjacentHTML('afterend', btnHtml);
+    } else {
+        if(order.deliveryBoyName) {
+            partnerEl.innerText = order.deliveryBoyName;
+            partnerEl.className = "text-xs font-bold text-golist";
+        } else {
+            partnerEl.innerText = "Not Assigned";
+            partnerEl.className = "text-xs font-bold text-slate-400";
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function cancelOrder(orderId) {
+    if(!confirm("Are you sure? This will cancel the order and move items back to your cart.")) return;
+
+    const order = window.cachedHistoryOrders[orderId] || activeTrackingOrder;
+    if(!order) return showToast("Error finding order");
+
+    localStorage.setItem('rmz_cart', JSON.stringify(order.cart));
+
+    db.ref('orders/' + orderId).remove()
+    .then(() => {
+        showToast("Order Cancelled! Items Restored.");
+        setTimeout(() => window.location.href = 'home.html', 500);
+    })
+    .catch(err => showToast("Error: " + err.message));
+}
+
+function closeInvoiceModal() {
+    document.getElementById('invoiceModal').classList.add('hidden');
+    const cBtn = document.getElementById('btnCancelOrder');
+    if(cBtn) cBtn.remove();
+}
+
+function downloadInvoiceAsImage() {
+    const element = document.getElementById('invoiceCaptureArea');
+    const orderId = document.getElementById('invOrderId').innerText.replace('#', '');
+    const btn = document.querySelector('#invoiceModal button i.fa-download').parentNode;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Generating...`;
+
+    html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `Invoice_${orderId}.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        btn.innerHTML = originalText;
+        showToast("Invoice Downloaded!");
+    }).catch(err => {
+        btn.innerHTML = originalText;
+        showToast("Error generating image");
+    });
+}
+
+
+// ==========================================
+// 6. LIVE TRACKING & SUPPORT 
+// ==========================================
+
+function checkActiveOrderHome() {
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    if(!session) return;
+
+    const saved = JSON.parse(localStorage.getItem('rmz_active_order'));
+    if(saved && saved.user.mobile === session.mobile) activateBanner(saved);
+
+    db.ref('orders').orderByChild('user/mobile').equalTo(session.mobile).limitToLast(1).on('value', snap => {
+        if(snap.exists()) {
+            const data = snap.val();
+            const orderId = Object.keys(data)[0];
+            const order = data[orderId];
+            const activeStatuses = ['placed', 'accepted', 'out_for_delivery', 'admin_accepted'];
+            if (activeStatuses.includes(order.status)) {
+                activeTrackingOrder = { id: orderId, ...order };
+                localStorage.setItem('rmz_active_order', JSON.stringify(activeTrackingOrder));
+                activateBanner(activeTrackingOrder);
+            } else {
+                localStorage.removeItem('rmz_active_order');
+                document.getElementById('liveOrderBanner').classList.add('hidden');
+            }
+        }
+    });
+}
+
+function activateBanner(order) {
+    const banner = document.getElementById('liveOrderBanner');
+    if(banner) {
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+        let text = "Processing...";
+        if(order.status === 'placed') text = "Waiting Confirmation";
+        else if(order.status === 'accepted') text = "Packing Items";
+        else if(order.status === 'out_for_delivery') text = "Out for Delivery";
+        document.getElementById('bannerStatus').innerText = text;
+        activeTrackingOrder = order;
+    }
+}
+
+function openTrackingModal() {
+    if(!activeTrackingOrder) {
+        const saved = JSON.parse(localStorage.getItem('rmz_active_order'));
+        if(saved) activeTrackingOrder = saved;
+        else return showToast("No active order details found");
+    }
+
+    const modal = document.getElementById('trackingModal');
+    modal.classList.remove('hidden');
+
+    document.getElementById('modalOrderId').innerText = activeTrackingOrder.orderId ? activeTrackingOrder.orderId.slice(-6) : '...';
+    document.getElementById('modalTotal').innerText = activeTrackingOrder.totalAmount || activeTrackingOrder.payment?.deliveryFee || '0';
+
+    const timelineContainer = document.getElementById('modalTimeline');
+    const steps = [
+        { key: 'placed', label: 'Order Placed' },
+        { key: 'accepted', label: 'Partner Assigned' },
+        { key: 'out_for_delivery', label: 'Out for Delivery' },
+        { key: 'delivered', label: 'Delivered' }
+    ];
+
+    let html = '';
+    let isStepActive = true; 
+    const currentStatus = activeTrackingOrder.status === 'admin_accepted' ? 'placed' : activeTrackingOrder.status;
+
+    steps.forEach((step, index) => {
+        const isCurrent = step.key === currentStatus;
+        const isCompleted = isStepActive; 
+        if (isCurrent) isStepActive = false; 
+        const dotClass = isCompleted ? 'timeline-dot active' : 'timeline-dot';
+        const textClass = isCompleted ? 'text-slate-800' : 'text-slate-400';
+        const connectorClass = (index !== steps.length - 1) ? `<div class="absolute left-[5px] top-[14px] w-0.5 h-full ${isCompleted && !isCurrent ? 'bg-green-500' : 'bg-slate-200'} -z-10"></div>` : '';
+        html += `<div class="relative pl-8 pb-1"><div class="absolute left-0 top-1 ${dotClass}"></div>${connectorClass}<h4 class="text-sm font-bold ${textClass}">${step.label}</h4></div>`;
+    });
+    timelineContainer.innerHTML = html;
+
+    let trackCancelBtn = document.getElementById('trackCancelBtn');
+    if(trackCancelBtn) trackCancelBtn.remove();
+
+    if(activeTrackingOrder.status === 'placed') {
+        const btn = document.createElement('button');
+        btn.id = 'trackCancelBtn';
+        btn.className = "w-full py-3 mt-4 bg-red-50 text-red-600 font-bold text-xs rounded-xl border border-red-100 hover:bg-red-100";
+        btn.innerHTML = '<i class="fa-solid fa-ban"></i> Cancel Order';
+        btn.onclick = () => { cancelOrder(activeTrackingOrder.id || Object.keys(window.cachedHistoryOrders).find(k => window.cachedHistoryOrders[k].orderId === activeTrackingOrder.orderId)); };
+        document.querySelector('#trackingModal .bg-white.rounded-xl.shadow-sm.border.p-5').appendChild(btn);
+    }
+
+    const pCard = document.getElementById('modalPartnerCard');
+    if(activeTrackingOrder.deliveryBoyName) {
+        pCard.classList.remove('hidden');
+        document.getElementById('modalPartnerName').innerText = activeTrackingOrder.deliveryBoyName;
+        document.getElementById('btnCallPartner').href = `tel:${activeTrackingOrder.deliveryBoyMobile}`;
+        document.getElementById('btnChatPartner').href = `https://wa.me/91${activeTrackingOrder.deliveryBoyMobile}`;
+    } else {
+        pCard.classList.add('hidden');
+    }
+
+    const list = document.getElementById('modalItemsList');
+    list.innerHTML = '';
+    if(activeTrackingOrder.cart) {
+        activeTrackingOrder.cart.forEach(item => {
+            list.innerHTML += `<div class="flex justify-between py-2 border-b border-slate-50 last:border-0"><span class="text-slate-600 text-sm font-medium">${item.name} <span class="text-[10px] text-slate-400">(${item.qty})</span></span><span class="font-bold text-slate-800 text-sm">x${item.count}</span></div>`;
+        });
+    }
+}
+
+function closeTrackingModal() {
+    document.getElementById('trackingModal').classList.add('hidden');
 }
 
 function shareStore() {
-    const url = `${window.location.origin}${window.location.pathname}?shop=${targetMobile}`;
-    const text = `Check out ${document.getElementById('headerShopName').innerText} on Ramazone!\nOrder here: ${url}`;
-    const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(waUrl, '_blank');
+    const url = window.location.href;
+    const name = document.getElementById('headerShopName').innerText;
+    const text = `Order fresh items from ${name} on GoList!\n${url}`;
+    if (navigator.share) navigator.share({ title: name, text: text, url: url });
+    else window.open(`https://wa.me/?text=${encodeURIComponent(text)}`);
 }
+
+function openSupportOptions() {
+    document.getElementById('supportModal').classList.remove('hidden');
+}
+
+function sendSupportMsg(type) {
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    const userName = session ? session.name : 'Guest';
+    const mobile = session ? session.mobile : 'N/A';
+    let extraInfo = '';
+    if(activeTrackingOrder) extraInfo = `\nActive Order ID: ${activeTrackingOrder.orderId ? activeTrackingOrder.orderId.slice(-6) : 'N/A'}`;
+    const text = `*Support Request*\nType: ${type}\nUser: ${userName} (${mobile})${extraInfo}\n\nPlease help me with this issue.`;
+    window.open(`https://wa.me/917903698180?text=${encodeURIComponent(text)}`, '_blank');
+}
+
+
+// ==========================================
+// 7. NEW FEATURES (Address, PIN, Content)
+// ==========================================
+
+// --- ADDRESS SYSTEM ---
+function openAddressModal() {
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    if(!session) return showToast("Login required");
+
+    // Fetch existing address
+    document.getElementById('inpAddress').value = "Loading...";
+    db.ref('users/' + session.mobile + '/address').once('value', snap => {
+        document.getElementById('inpAddress').value = snap.exists() ? snap.val() : "";
+    });
+
+    document.getElementById('addressModal').classList.remove('hidden');
+}
+
+function closeAddressModal() {
+    document.getElementById('addressModal').classList.add('hidden');
+}
+
+function saveAddress() {
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+    const addr = document.getElementById('inpAddress').value.trim();
+
+    if(!addr) return showToast("Please enter address");
+    if(!session) return;
+
+    db.ref('users/' + session.mobile).update({ address: addr })
+    .then(() => {
+        showToast("Address Saved!");
+        closeAddressModal();
+    });
+}
+
+// --- PIN CHANGE SYSTEM ---
+function openPinModal() {
+    document.getElementById('inpNewPin').value = '';
+    document.getElementById('inpConfirmPin').value = '';
+    document.getElementById('pinModal').classList.remove('hidden');
+}
+
+function closePinModal() {
+    document.getElementById('pinModal').classList.add('hidden');
+}
+
+function updatePin() {
+    const newPin = document.getElementById('inpNewPin').value;
+    const confPin = document.getElementById('inpConfirmPin').value;
+    const session = JSON.parse(localStorage.getItem('rmz_user'));
+
+    if(newPin.length !== 4) return showToast("PIN must be 4 digits");
+    if(newPin !== confPin) return showToast("PINs do not match");
+
+    db.ref('users/' + session.mobile).update({ pin: newPin })
+    .then(() => {
+        showToast("PIN Updated Successfully!");
+        closePinModal();
+    });
+}
+
+// --- DYNAMIC CONTENT (Policies & Videos) ---
+function fetchDynamicContent(type) {
+    const modal = document.getElementById('contentModal');
+    const title = document.getElementById('contentTitle');
+    const body = document.getElementById('contentBody');
+
+    modal.classList.remove('hidden');
+    body.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-2xl text-slate-300"></i></div>';
+
+    if(type === 'policy') {
+        title.innerText = "Policies & Terms";
+        db.ref('admin/policies/about').once('value', snap => {
+            if(snap.exists()) {
+                body.innerHTML = snap.val();
+            } else {
+                body.innerHTML = "<p>No policies updated yet.</p>";
+            }
+        });
+    } 
+    else if(type === 'video') {
+        title.innerText = "How to Use App";
+        // Fetch last added video
+        db.ref('admin/videos').limitToLast(1).once('value', snap => {
+            if(snap.exists()) {
+                const data = Object.values(snap.val())[0];
+                const videoId = extractYouTubeID(data.link);
+                if(videoId) {
+                    body.innerHTML = `
+                        <div class="aspect-video w-full rounded-xl overflow-hidden shadow-lg mb-4">
+                            <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                        <h3 class="font-bold text-lg text-slate-800">${data.title}</h3>
+                        <p class="text-xs text-slate-400 mt-1">Uploaded: ${new Date(data.addedAt || Date.now()).toLocaleDateString()}</p>
+                    `;
+                } else {
+                    body.innerHTML = "<p>Invalid Video Link found.</p>";
+                }
+            } else {
+                body.innerHTML = "<p>No tutorial videos found.</p>";
+            }
+        });
+    }
+}
+
+function extractYouTubeID(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function closeContentModal() {
+    document.getElementById('contentModal').classList.add('hidden');
+}
+
+// Global Exports for New Features
+window.openAddModal = openAddModal;
+window.closeAddModal = closeAddModal;
+window.saveProduct = saveProduct;
+window.openHistory = openHistory;
+window.viewOrderInvoice = viewOrderInvoice;
+window.closeInvoiceModal = closeInvoiceModal;
+window.downloadInvoiceAsImage = downloadInvoiceAsImage;
+window.checkActiveOrderHome = checkActiveOrderHome;
+window.openTrackingModal = openTrackingModal;
+window.closeTrackingModal = closeTrackingModal;
+window.shareStore = shareStore;
+window.openSupportOptions = openSupportOptions;
+
+// New Exports
+window.openAddressModal = openAddressModal;
+window.closeAddressModal = closeAddressModal;
+window.saveAddress = saveAddress;
+window.openPinModal = openPinModal;
+window.closePinModal = closePinModal;
+window.updatePin = updatePin;
+window.fetchDynamicContent = fetchDynamicContent;
+window.closeContentModal = closeContentModal;

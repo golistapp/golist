@@ -1,3 +1,5 @@
+// home-core.js
+
 // --- CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyCmgMr4cj7ec1B09eu3xpRhCwsVCeQR9v0",
@@ -14,51 +16,54 @@ const db = firebase.database();
 // --- STATE MANAGEMENT ---
 const session = JSON.parse(localStorage.getItem('rmz_user'));
 const urlParams = new URLSearchParams(window.location.search);
-// Default to session mobile if 'shop' param is missing (for owner view)
 const targetMobile = urlParams.get('shop') || (session ? session.mobile : null);
 
-// If no target shop and no session, go to login
 if (!targetMobile) window.location.href = 'index.html'; 
 
 const isOwner = session && session.mobile === targetMobile;
-const CACHE_KEY = `rmz_products_${targetMobile}`;
 
-// Global Variables
-let editMode = false;
-let deleteMode = false;
-let editItemId = null;
+// Data Holders (Global Access Enabled)
+window.allProducts = [];       
+window.masterCategories = {};  
+window.masterUnits = {};
+window.masterProductsList = []; 
+window.lastOrderItems = []; 
+let activeCategory = 'all';
+
+// Edit/Delete States
+let isEditMode = false;
+let isDeleteMode = false;
 let itemsToDelete = new Set();
-let allProducts = [];
-let filteredProducts = [];
 
 // --- INITIALIZATION ---
 window.onload = () => {
-    // 1. UI & User Data
-    setupUI();
-    loadShopData();
-    updateCartBadge();
+    setupHeader();
+    setupSideMenu(); 
 
-    // 2. Core Content (Products)
-    loadLocalProducts(); // Show cached first for speed
-    syncProducts();      // Then fetch fresh from Firebase
-    // Stats calculation removed
+    // 1. Load all Master Data
+    loadMasterData();
 
-    // 3. Feature Loading (Functions from home-features.js)
-    if (typeof loadProfile === 'function') loadProfile();
-    // Slider init removed
+    // 2. Load User's Products
+    syncUserProducts();
+
+    // 3. Load Recent Orders (Dynamic)
+    loadRecentOrders();
+
+    // 4. Update Cart Bar
+    updateBottomBar();
+
+    // 5. Feature Checks
     if (typeof checkActiveOrderHome === 'function') checkActiveOrderHome();
 };
 
 // --- UTILS ---
 function showToast(msg) {
     const t = document.getElementById('toast');
-    document.getElementById('toastMsg').innerText = msg;
-    t.classList.remove('opacity-0', 'pointer-events-none');
-    t.style.transform = "translate(-50%, 0)";
-    setTimeout(() => { 
-        t.classList.add('opacity-0', 'pointer-events-none'); 
-        t.style.transform = "translate(-50%, -10px)"; 
-    }, 2000);
+    if(t) {
+        document.getElementById('toastMsg').innerText = msg;
+        t.classList.remove('opacity-0', 'pointer-events-none');
+        setTimeout(() => t.classList.add('opacity-0', 'pointer-events-none'), 2000);
+    }
 }
 
 function toggleMenu() { 
@@ -66,135 +71,263 @@ function toggleMenu() {
     document.getElementById('menuOverlay').classList.toggle('open'); 
 }
 
-function closeModal(id) {
-    document.getElementById(id).classList.add('hidden');
+// Auto Emoji Logic (Fallback)
+function getEmoji(name) {
+    if (!name) return '📦';
+    const n = name.toLowerCase();
+    const map = {
+        'potato': '🥔', 'aloo': '🥔', 'onion': '🧅', 'pyaz': '🧅',
+        'tomato': '🍅', 'tamatar': '🍅', 'milk': '🥛', 'doodh': '🥛', 
+        'bread': '🍞', 'egg': '🥚', 'banana': '🍌', 'kela': '🍌', 
+        'apple': '🍎', 'seb': '🍎', 'rice': '🍚', 'chawal': '🍚',
+        'oil': '🛢️', 'soap': '🧼', 'shampoo': '🧴', 'surf': '🧺',
+        'biscuit': '🍪', 'chips': '🍟', 'chocolate': '🍫',
+        'curd': '🥣', 'dahi': '🥣', 'paneer': '🧀', 'butter': '🧈',
+        'veg': '🥦', 'fruit': '🍎'
+    };
+    for (const key in map) if (n.includes(key)) return map[key];
+    return '📦';
 }
 
-function logout() { 
-    localStorage.removeItem('rmz_user');
-    localStorage.removeItem('rmz_active_order'); // Order data hatao
-    localStorage.removeItem('rmz_cart');         // Cart bhi khali karo (optional but recommended)
-    window.location.href='index.html'; 
-}
-
-
-// --- UI SETUP & NAVIGATION ---
-function setupUI() {
-    let menuHtml = '';
-
-    // Common Top Items
-    if (isOwner) {
-        document.getElementById('ownerControls').classList.remove('hidden');
-        document.getElementById('fabAddStock').classList.remove('hidden');
-        document.getElementById('logoUploadBtn').classList.remove('hidden');
-        document.getElementById('menuName').innerText = session.name || 'Owner';
+// --- 1. SETUP & MENU ---
+function setupHeader() {
+    if(session) {
+        document.getElementById('menuName').innerText = session.name || 'User';
         document.getElementById('menuMobile').innerText = '+91 ' + session.mobile;
-
-        // Note: openAddModal, openHistory, etc. are in home-features.js
-        menuHtml += `
-            <button onclick="openAddModal()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
-                <i class="fa-solid fa-box text-indigo-500 w-5"></i> Add Product
-            </button>
-            <button onclick="openHistory()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
-                <i class="fa-solid fa-clock-rotate-left text-blue-500 w-5"></i> Order History
-            </button>
-
-            <div class="h-px bg-slate-100 my-2"></div>
-
-            <button onclick="document.getElementById('profileMenuModal').classList.remove('hidden'); toggleMenu();" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
-                <i class="fa-solid fa-user-gear text-slate-500 w-5"></i> My Shop Profile
-            </button>
-        `;
-    } else {
-        // Guest Menu
-        menuHtml += `
-            <button onclick="window.location.href='index.html'" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
-                <i class="fa-solid fa-store text-indigo-500 w-5"></i> Create My Own Store
-            </button>
-        `;
+        db.ref('users/' + targetMobile + '/logo').once('value', s => {
+            if(s.exists()) document.getElementById('profileImg').src = s.val();
+        });
     }
+}
 
-    // Common Bottom Items
-    menuHtml += `
-        <button onclick="openVideoHelp()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
+function setupSideMenu() {
+    const nav = document.getElementById('sidebarNav');
+    // UPDATED MENU STRUCTURE
+    let html = `
+        <button onclick="toggleMenu(); openAddModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+            <i class="fa-solid fa-plus text-golist w-5 text-lg"></i> Add Product
+        </button>
+
+        <button onclick="openHistory()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+            <i class="fa-solid fa-clock-rotate-left text-blue-600 w-5"></i> Order History
+        </button>
+
+        <div class="h-px bg-slate-100 my-1 mx-4"></div>
+
+        <button onclick="toggleMenu(); openAddressModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+            <i class="fa-solid fa-location-dot text-indigo-500 w-5"></i> My Address
+        </button>
+
+        <button onclick="toggleMenu(); openPinModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+            <i class="fa-solid fa-key text-orange-500 w-5"></i> Change PIN
+        </button>
+
+        <div class="h-px bg-slate-100 my-1 mx-4"></div>
+
+        <button onclick="toggleMenu(); fetchDynamicContent('video')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-brands fa-youtube text-red-500 w-5"></i> How to Use App
         </button>
 
-        <button onclick="openSupportOptions()" class="w-full text-left px-4 py-3 rounded hover:bg-green-50 text-green-600 font-bold text-sm flex items-center gap-3">
+        <button onclick="openSupportOptions()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-golist font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-brands fa-whatsapp w-5 text-xl"></i> Contact Support
         </button>
 
-        <button onclick="openPolicies()" class="w-full text-left px-4 py-3 rounded hover:bg-slate-50 text-slate-700 font-bold text-sm flex items-center gap-3">
+        <button onclick="toggleMenu(); fetchDynamicContent('policy')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-shield-halved text-slate-400 w-5"></i> Policies & Terms
         </button>
 
-        <div class="h-px bg-slate-100 my-2"></div>
-        <button onclick="logout()" class="w-full text-left px-4 py-3 rounded hover:bg-red-50 text-red-500 font-bold text-sm flex items-center gap-3">
+        <div class="h-px bg-slate-100 my-1 mx-4"></div>
+
+        <button onclick="logout()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-red-50 text-red-500 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-power-off w-5"></i> Logout
         </button>
     `;
-
-    document.getElementById('sidebarNav').innerHTML = menuHtml;
+    nav.innerHTML = html;
 }
 
-function loadShopData() {
-    db.ref('users/' + targetMobile).on('value', s => {
-        if(s.exists()) {
-            const d = s.val();
-            const shop = d.shopName || d.name + "'s Store";
-            document.getElementById('headerShopName').innerText = shop;
+function logout() {
+    localStorage.removeItem('rmz_user');
+    window.location.href = 'index.html';
+}
+
+// --- 2. MASTER DATA LOADING ---
+function loadMasterData() {
+    db.ref('masterCategories').once('value', snap => {
+        if(snap.exists()) {
+            window.masterCategories = snap.val();
+            renderCategoriesUI();
+        }
+    });
+
+    db.ref('masterUnits').once('value', snap => {
+        if(snap.exists()) { window.masterUnits = snap.val(); }
+    });
+
+    db.ref('masterProducts').once('value', snap => {
+        if(snap.exists()) {
+            window.masterProductsList = Object.values(snap.val());
+            if(window.allProducts.length > 0) filterProducts();
         }
     });
 }
 
-// --- STATS SYSTEM REMOVED ---
+function renderCategoriesUI() {
+    const list = document.getElementById('categoryList');
+    list.innerHTML = `
+        <button onclick="filterByCategory('all')" class="flex flex-col items-center gap-1 min-w-[60px] group">
+            <div class="w-12 h-12 rounded-xl bg-golistLight border border-green-100 flex items-center justify-center text-golist group-hover:bg-golist group-hover:text-white transition shadow-sm">
+                <i class="fa-solid fa-border-all text-lg"></i>
+            </div>
+            <span class="text-[10px] font-bold text-slate-600 group-hover:text-golist">All</span>
+        </button>
+    `;
 
-// --- PRODUCT LOADING ---
-function loadLocalProducts() {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if(cached) { 
-        allProducts = JSON.parse(cached);
-        filteredProducts = allProducts; 
-        // Stat update removed
-        renderList(allProducts); 
-    }
+    const sortedCats = Object.entries(window.masterCategories)
+        .map(([key, val]) => ({ key, ...val }))
+        .sort((a, b) => {
+            const orderA = (a.order !== undefined && a.order !== null) ? a.order : 9999;
+            const orderB = (b.order !== undefined && b.order !== null) ? b.order : 9999;
+            return orderA - orderB;
+        });
+
+    sortedCats.forEach(cat => {
+        const content = cat.image 
+            ? `<img src="${cat.image}" class="w-full h-full object-cover">` 
+            : `<i class="fa-solid fa-layer-group text-xl text-slate-400"></i>`;
+
+        const btn = document.createElement('button');
+        btn.onclick = () => filterByCategory(cat.key);
+        btn.className = "flex flex-col items-center gap-1 min-w-[60px] group transition active:scale-95";
+        btn.innerHTML = `
+            <div class="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center shadow-sm group-hover:border-green-200 overflow-hidden p-0.5">
+                <div class="w-full h-full rounded-xl overflow-hidden flex items-center justify-center bg-slate-50">
+                    ${content}
+                </div>
+            </div>
+            <span class="text-[10px] font-bold text-slate-600 truncate w-full text-center max-w-[60px] group-hover:text-golist">${cat.name}</span>
+        `;
+        list.appendChild(btn);
+    });
 }
 
-function syncProducts() {
+// --- 3. RECENT ORDERS (Last Order Items) ---
+function loadRecentOrders() {
+    const list = document.getElementById('recentList');
+    const section = document.getElementById('recentSection');
+
+    if(!session) { section.classList.add('hidden'); return; }
+
+    db.ref('orders').orderByChild('user/mobile').equalTo(session.mobile).limitToLast(1).once('value', snap => {
+        if(!snap.exists()) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        const data = snap.val();
+        const orderId = Object.keys(data)[0];
+        const lastOrder = data[orderId];
+
+        if(!lastOrder.cart || lastOrder.cart.length === 0) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        section.classList.remove('hidden');
+        window.lastOrderItems = lastOrder.cart; 
+        list.innerHTML = '';
+
+        const repeatCard = document.createElement('div');
+        repeatCard.className = "w-20 bg-green-50 rounded-2xl p-2 border border-green-100 shadow-sm flex flex-col items-center justify-center flex-shrink-0 snap-start cursor-pointer active:scale-95 transition hover:bg-green-100";
+        repeatCard.onclick = repeatLastOrder;
+        repeatCard.innerHTML = `
+            <div class="w-10 h-10 rounded-full bg-golist text-white mb-1 flex items-center justify-center shadow-md">
+                <i class="fa-solid fa-rotate-right text-lg"></i>
+            </div>
+            <div class="text-center leading-tight">
+                <h4 class="font-extrabold text-golist text-[10px]">Repeat</h4>
+                <p class="text-[9px] font-bold text-slate-500">Order</p>
+            </div>
+        `;
+        list.appendChild(repeatCard);
+
+        lastOrder.cart.forEach(item => {
+            let imageHtml = '';
+            const masterMatch = window.masterProductsList?.find(mp => mp.name.toLowerCase() === item.name.toLowerCase());
+
+            if(masterMatch && masterMatch.image) {
+                 imageHtml = `<img src="${masterMatch.image}" class="w-full h-full object-cover rounded-full">`;
+            } else {
+                 imageHtml = getEmoji(item.name);
+            }
+
+            const div = document.createElement('div');
+            div.className = "w-20 bg-white rounded-2xl p-1.5 border border-slate-100 shadow-sm flex flex-col items-center justify-between flex-shrink-0 snap-start";
+            div.innerHTML = `
+                <div class="w-10 h-10 rounded-full bg-slate-50 mb-1 flex items-center justify-center text-xl shadow-inner overflow-hidden">
+                    ${imageHtml}
+                </div>
+                <div class="w-full text-center">
+                    <h4 class="font-bold text-slate-800 text-[10px] truncate leading-tight mb-0.5">${item.name}</h4>
+                    <p class="text-[9px] text-slate-400 font-bold leading-none mb-1">${item.qty || 'Unit'}</p>
+
+                    <div class="flex justify-between items-center w-full px-0.5 bg-slate-50 rounded-lg py-0.5">
+                        <span class="text-[9px] font-bold text-slate-600">₹${item.price}</span>
+                        <button onclick="updateCart('${item.name}', '${item.qty}', '${item.price}', 1)" class="w-4 h-4 rounded-full bg-golist text-white flex items-center justify-center shadow-sm active:scale-90 transition">
+                            <i class="fa-solid fa-plus text-[7px]"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    });
+}
+
+function repeatLastOrder() {
+    if(!window.lastOrderItems || window.lastOrderItems.length === 0) return;
+    window.lastOrderItems.forEach(item => {
+        const qtyToAdd = item.count || 1;
+        updateCart(item.name, item.qty, item.price, qtyToAdd);
+    });
+    showToast("All items added to cart!");
+    const bar = document.getElementById('bottomBar');
+    if(bar) bar.classList.add('animate-bounce');
+    setTimeout(() => { if(bar) bar.classList.remove('animate-bounce'); }, 1000);
+}
+
+// --- 4. MAIN PRODUCT LIST ---
+function syncUserProducts() {
     db.ref('products/' + targetMobile).on('value', snapshot => {
         if(snapshot.exists()) {
-            allProducts = Object.entries(snapshot.val()).reverse();
-            localStorage.setItem(CACHE_KEY, JSON.stringify(allProducts));
-
-            // Stat update removed
-
-            // Keep search filter if active
-            const query = document.getElementById('searchInput').value.toLowerCase();
-            if(query) filterProducts(); 
-            else {
-                filteredProducts = allProducts;
-                renderList(allProducts);
-            }
+            window.allProducts = Object.entries(snapshot.val()).map(([key, val]) => ({id: key, ...val})).reverse();
+            filterProducts(); 
         } else {
-            allProducts = [];
-            filteredProducts = [];
-            localStorage.removeItem(CACHE_KEY);
-            // Stat update removed
+            window.allProducts = [];
             renderList([]);
         }
     });
 }
 
-function filterProducts() {
-    const query = document.getElementById('searchInput').value.toLowerCase();
-    if (!query) {
-        filteredProducts = allProducts;
+function filterByCategory(catId) {
+    activeCategory = catId;
+    const searchVal = document.getElementById('searchInput').value.toLowerCase();
+
+    if(catId !== 'all') {
+        const catName = window.masterCategories[catId]?.name || 'Category';
+        showToast(`Showing: ${catName}`);
     } else {
-        filteredProducts = allProducts.filter(([id, item]) => 
-            item.name.toLowerCase().includes(query)
-        );
+        showToast("Showing All Items");
     }
-    renderList(filteredProducts);
+
+    let filtered = window.allProducts;
+    if (catId !== 'all') filtered = filtered.filter(item => item.category === catId);
+    if(searchVal) filtered = filtered.filter(item => item.name.toLowerCase().includes(searchVal));
+
+    renderList(filtered);
+}
+
+function filterProducts() {
+    filterByCategory(activeCategory);
 }
 
 function renderList(products) {
@@ -202,130 +335,168 @@ function renderList(products) {
     list.innerHTML = '';
 
     if(products.length === 0) {
-        list.innerHTML = `<div class="p-8 text-center opacity-50"><p class="text-xs">No items found</p></div>`;
+        list.innerHTML = `<div class="text-center py-10 opacity-50"><p class="text-xs font-bold text-slate-400">No products found</p></div>`;
         return;
     }
 
-    products.forEach(([id, item]) => {
-        const li = document.createElement('li');
-        li.className = "bg-white border-b border-slate-50 p-4 flex items-center justify-between hover:bg-slate-50 transition-colors";
+    products.forEach(item => {
+        const price = item.price || 0;
+        const fullQty = item.qty || ''; 
 
-        let leftContent = `
-            <div>
-                <h4 class="font-bold text-slate-800 text-sm">${item.name}</h4>
-                <p class="text-[11px] text-slate-400 font-bold uppercase mt-0.5">${item.qty}</p>
-            </div>
-        `;
+        let imageContent = '';
+        const masterMatch = window.masterProductsList?.find(mp => mp.name.toLowerCase() === item.name.toLowerCase());
 
-        let rightAction = '';
-
-        if (deleteMode && isOwner) {
-            const isChecked = itemsToDelete.has(id);
-            leftContent = `
-                <div class="flex items-center gap-4 w-full" onclick="toggleCheck('${id}')">
-                    <input type="checkbox" class="custom-check pointer-events-none" ${isChecked ? 'checked' : ''}>
-                    <div>
-                        <h4 class="font-bold text-slate-800 text-sm">${item.name}</h4>
-                        <span class="text-xs text-slate-500 font-medium">${item.qty}</span>
-                    </div>
-                </div>
-            `;
-        } else if (editMode && isOwner) {
-            rightAction = `<span class="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">EDIT</span>`;
-            // openAddModal is in home-features.js, but will be available when clicked
-            li.onclick = () => openAddModal(id, item.name, item.qty);
-            li.classList.add('cursor-pointer');
+        if(masterMatch && masterMatch.image) {
+            imageContent = `<img src="${masterMatch.image}" class="w-full h-full object-cover">`;
         } else {
-            // Main 'Add' button
-            rightAction = `<button onclick="addToCartLocal('${item.name}', '${item.qty}')" class="w-8 h-8 rounded bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-900 hover:text-white transition active:scale-90"><i class="fa-solid fa-plus text-xs"></i></button>`;
+            imageContent = getEmoji(item.name);
         }
 
-        li.innerHTML = `${leftContent} ${rightAction}`;
+        const li = document.createElement('li');
+        li.className = "bg-white border border-slate-100 rounded-2xl p-2 flex items-center gap-3 shadow-sm relative";
+
+        let controlHtml = '';
+
+        if (isDeleteMode) {
+            const isChecked = itemsToDelete.has(item.id) ? 'checked' : '';
+            controlHtml = `<input type="checkbox" class="custom-check" onclick="toggleDeleteItem('${item.id}')" ${isChecked}>`;
+        } else if (isEditMode) {
+            controlHtml = `<button onclick="openAddModal('${item.id}', '${item.name}', '${item.qty}', '${item.price}', '${item.category}', '${item.unit}')" class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100"><i class="fa-solid fa-pencil text-xs"></i></button>`;
+        } else {
+            const cartItem = getCartItem(item.name); 
+            const count = cartItem ? cartItem.count : 0;
+
+            if (count === 0) {
+                controlHtml = `
+                    <button onclick="updateCart('${item.name}', '${fullQty}', '${item.price}', 1)" class="w-16 h-8 bg-white text-golist font-bold text-xs rounded-lg border border-green-200 shadow-sm hover:bg-golist hover:text-white transition active:scale-95 flex items-center justify-center gap-1">
+                        ADD <i class="fa-solid fa-plus text-[9px]"></i>
+                    </button>`;
+            } else {
+                controlHtml = `
+                    <div class="w-20 h-8 flex items-center justify-between bg-golist rounded-lg shadow-md px-1">
+                        <button onclick="updateCart('${item.name}', '${fullQty}', '${item.price}', -1)" class="w-6 h-full text-white flex items-center justify-center active:scale-75 transition"><i class="fa-solid fa-minus text-[9px]"></i></button>
+                        <span class="text-white font-bold text-sm min-w-[16px] text-center">${count}</span>
+                        <button onclick="updateCart('${item.name}', '${fullQty}', '${item.price}', 1)" class="w-6 h-full text-white flex items-center justify-center active:scale-75 transition"><i class="fa-solid fa-plus text-[9px]"></i></button>
+                    </div>`;
+            }
+        }
+
+        li.innerHTML = `
+            <div class="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center text-xl flex-shrink-0 border border-slate-100 shadow-sm overflow-hidden p-0.5">
+                <div class="w-full h-full rounded-lg overflow-hidden flex items-center justify-center bg-white">
+                    ${imageContent}
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h4 class="font-bold text-slate-800 text-sm truncate leading-tight">${item.name}</h4>
+                <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-[10px] text-slate-500 font-medium">${fullQty}</span>
+                </div>
+                <div class="font-extrabold text-slate-900 text-xs mt-0.5">₹${price}</div>
+            </div>
+            <div class="flex-shrink-0 pl-1">
+                ${controlHtml}
+            </div>
+        `;
         list.appendChild(li);
     });
 }
 
-// --- GLOBAL ACTIONS (Delete/Edit State) ---
+// --- 5. CONTROL MODES & CART ---
 function toggleEditMode() {
-    if(!isOwner) return;
-    if(deleteMode) toggleDeleteMode();
-    editMode = !editMode;
-    const btn = document.getElementById('globalEditBtn');
-    if(editMode) { btn.classList.add('bg-indigo-100', 'text-indigo-600'); showToast("Tap item to Edit"); } 
-    else { btn.classList.remove('bg-indigo-100', 'text-indigo-600'); }
-    renderList(allProducts);
+    isEditMode = !isEditMode;
+    isDeleteMode = false;
+    updateControlUI();
 }
 
 function toggleDeleteMode() {
-    if(!isOwner) return;
-    if(editMode) toggleEditMode();
-    deleteMode = !deleteMode;
-    const btn = document.getElementById('globalDeleteBtn');
-    const bar = document.getElementById('bulkDeleteBar');
-    if(deleteMode) { btn.classList.add('bg-red-100', 'text-red-600'); bar.classList.remove('hidden'); showToast("Select items"); } 
-    else { btn.classList.remove('bg-red-100', 'text-red-600'); bar.classList.add('hidden'); itemsToDelete.clear(); }
-    renderList(allProducts); 
+    isDeleteMode = !isDeleteMode;
+    isEditMode = false;
+    itemsToDelete.clear();
+    updateControlUI();
 }
 
-function toggleCheck(id) { 
-    if(itemsToDelete.has(id)) itemsToDelete.delete(id); 
-    else itemsToDelete.add(id); 
-    renderList(allProducts); 
+function updateControlUI() {
+    const editBtn = document.getElementById('btnEditMode');
+    const delBtn = document.getElementById('btnDeleteMode');
+    const delBar = document.getElementById('bulkDeleteAction');
+
+    editBtn.className = "w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center border border-slate-100 transition";
+    delBtn.className = "w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center border border-slate-100 transition";
+    delBar.classList.add('hidden');
+
+    if(isEditMode) {
+        editBtn.className = "w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-md";
+        showToast("Tap pencil to edit item");
+    }
+    if(isDeleteMode) {
+        delBtn.className = "w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center shadow-md";
+        delBar.classList.remove('hidden');
+        showToast("Select items to delete");
+    }
+    filterProducts();
 }
 
-function deleteSelectedItems() {
+function toggleDeleteItem(id) {
+    if(itemsToDelete.has(id)) itemsToDelete.delete(id);
+    else itemsToDelete.add(id);
+}
+
+function confirmBulkDelete() {
     if(itemsToDelete.size === 0) return showToast("No items selected");
     if(confirm(`Delete ${itemsToDelete.size} items?`)) {
-        itemsToDelete.forEach(id => db.ref(`products/${targetMobile}/${id}`).remove());
-        toggleDeleteMode();
-        showToast("Deleted");
+        itemsToDelete.forEach(id => {
+            db.ref(`products/${targetMobile}/${id}`).remove();
+        });
+        toggleDeleteMode(); 
+        showToast("Items Deleted");
     }
 }
 
-// --- CART LOGIC ---
-function addToCartLocal(name, qty) { 
-    let cart = JSON.parse(localStorage.getItem('rmz_cart')) || []; 
-    const exists = cart.find(i => i.name === name && i.qty === qty); 
-    if(exists) exists.count = (exists.count || 1) + 1; 
-    else cart.push({ name, qty, count: 1 }); 
-    localStorage.setItem('rmz_cart', JSON.stringify(cart)); 
-    updateCartBadge(); 
-    showToast("Added to Bill"); 
-}
+function getCart() { return JSON.parse(localStorage.getItem('rmz_cart')) || []; }
+function getCartItem(name) { return getCart().find(i => i.name === name); }
 
-function updateCartBadge() { 
-    const c = JSON.parse(localStorage.getItem('rmz_cart')) || []; 
-    const b = document.getElementById('floatCartBadge'); 
-    const h = document.getElementById('headerBadge'); 
-    if(c.length > 0) { 
-        b.innerText = c.length; b.classList.remove('hidden'); h.classList.remove('hidden'); 
-    } else { 
-        b.classList.add('hidden'); h.classList.add('hidden'); 
-    } 
-}
+function updateCart(name, qty, price, change) {
+    let cart = getCart();
+    let itemIndex = cart.findIndex(i => i.name === name);
 
-// --- SEARCH BAR LOGIC ---
-function activateSearch() {
-    document.body.classList.add('search-mode');
-    document.getElementById('headerControls').classList.add('hidden');
-    document.getElementById('clearSearchBtn').classList.remove('hidden');
-}
+    if (navigator.vibrate) navigator.vibrate(40); 
 
-function deactivateSearch() {
-    // Left empty to keep search open until 'X' is clicked
-}
+    if (itemIndex > -1) {
+        cart[itemIndex].count += change;
+        if (cart[itemIndex].count <= 0) cart.splice(itemIndex, 1);
+    } else if (change > 0) {
+        cart.push({ name, qty, price, count: change }); 
+    }
 
-function clearSearch() {
-    const input = document.getElementById('searchInput');
-    input.value = '';
-
-    // Reset products
+    localStorage.setItem('rmz_cart', JSON.stringify(cart));
     filterProducts(); 
-
-    // Reset UI
-    document.body.classList.remove('search-mode');
-    document.getElementById('headerControls').classList.remove('hidden');
-    document.getElementById('clearSearchBtn').classList.add('hidden');
-
-    input.blur(); 
+    updateBottomBar();
 }
+
+function updateBottomBar() {
+    const cart = getCart();
+    const bar = document.getElementById('bottomBar');
+    if(cart.length > 0) {
+        bar.classList.remove('hidden');
+        let total = 0, count = 0;
+        cart.forEach(i => { total += (parseFloat(i.price)||0) * i.count; count += i.count; });
+        document.getElementById('barCount').innerText = count;
+        document.getElementById('barTotal').innerText = total;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+// Global Exports
+window.updateCart = updateCart;
+window.filterByCategory = filterByCategory;
+window.toggleEditMode = toggleEditMode;
+window.toggleDeleteMode = toggleDeleteMode;
+window.confirmBulkDelete = confirmBulkDelete;
+window.toggleDeleteItem = toggleDeleteItem;
+window.toggleMenu = toggleMenu;
+window.logout = logout;
+window.openSupportOptions = openSupportOptions; 
+window.setupSideMenu = setupSideMenu; 
+// openAddressModal etc. will be exported from home-features.js
