@@ -7,7 +7,7 @@ let currentPartnerData = null;
 export default {
     async render(container, db) {
         // ============================================================
-        // 🎨 UI RENDER (LIGHT THEME UPDATED)
+        // 🎨 UI RENDER
         // ============================================================
         container.innerHTML = `
             <div class="h-full flex flex-col relative fade-in bg-slate-50">
@@ -15,7 +15,7 @@ export default {
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 border-b border-slate-200 pb-3 shrink-0 px-4 pt-4 bg-white shadow-sm z-10">
                     <div>
                         <h2 class="text-xl font-bold text-slate-800 tracking-tight">Delivery Team</h2>
-                        <p class="text-[10px] text-slate-500 font-medium">Manage Riders & Wallets</p>
+                        <p class="text-[10px] text-slate-500 font-medium">Manage Riders & Settlements</p>
                     </div>
 
                     <div class="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
@@ -91,7 +91,7 @@ export default {
                             <div class="grid grid-cols-2 gap-3">
                                 <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
                                     <p class="text-[9px] text-slate-400 uppercase font-bold mb-1">Lifetime Earnings</p>
-                                    <p class="text-lg font-bold text-green-600">₹<span id="m-earnings">0</span></p>
+                                    <p class="text-lg font-bold text-green-600">₹<span id="m-lifetime-earnings">0</span></p>
                                 </div>
                                 <div class="bg-white p-3 rounded-xl border border-slate-200 text-center">
                                     <p class="text-[9px] text-slate-400 uppercase font-bold mb-1">Last Active</p>
@@ -109,8 +109,8 @@ export default {
 
                             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                 <div class="flex justify-between items-center mb-4">
-                                    <p class="text-[10px] text-slate-400 uppercase font-bold">Wallet Balance</p>
-                                    <p class="text-xl font-bold text-slate-800">₹<span id="m-balance">0</span></p>
+                                    <p class="text-[10px] text-slate-400 uppercase font-bold">Payable Earnings</p>
+                                    <p class="text-xl font-bold text-slate-800">₹<span id="m-payable-earnings">0</span></p>
                                 </div>
                                 <div class="flex gap-2">
                                     <input type="number" id="settle-amount" placeholder="Amount Paid" class="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500">
@@ -118,7 +118,15 @@ export default {
                                         SETTLE
                                     </button>
                                 </div>
-                                <p class="text-[9px] text-slate-400 mt-2">Entering amount reduces balance. History preserved.</p>
+                                <p class="text-[9px] text-slate-400 mt-2 border-b border-slate-100 pb-2">Amount will be deducted from Payable Earnings.</p>
+
+                                <button id="btn-view-history" class="w-full text-center text-[10px] font-bold text-blue-600 mt-2 hover:underline flex items-center justify-center gap-1">
+                                    <i class="fa-solid fa-clock-rotate-left"></i> View Settlement History
+                                </button>
+
+                                <div id="history-container" class="hidden mt-3 space-y-2 max-h-40 overflow-y-auto custom-scrollbar border-t border-slate-100 pt-2">
+                                    <p class="text-center text-[10px] text-slate-400 py-2">Loading history...</p>
+                                </div>
                             </div>
 
                             <details class="group bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -177,7 +185,7 @@ export default {
             </div>
         `;
 
-        // Tab Logic (Updated for Light Theme classes)
+        // Tab Logic
         window.switchPartnerTab = (tab) => {
             const viewActive = document.getElementById('view-active');
             const viewReq = document.getElementById('view-requests');
@@ -208,9 +216,6 @@ export default {
         delete window.switchPartnerTab;
     },
 
-    // ============================================================
-    // 🛠️ HELPER: Time Ago
-    // ============================================================
     getTimeAgo(timestamp) {
         if(!timestamp) return "Never";
         const diff = Date.now() - timestamp;
@@ -223,7 +228,25 @@ export default {
     },
 
     attachEvents(db) {
-        // --- PIN TOGGLE & MANAGE CLICK ---
+        // --- REQUEST LIST APPROVE LOGIC ---
+        document.getElementById('request-list').addEventListener('click', (e) => {
+            const approveBtn = e.target.closest('.btn-approve-request');
+            if (approveBtn) {
+                const mobile = approveBtn.dataset.id;
+                if(confirm("Approve this rider? They will be able to login immediately.")) {
+                    // Update Status to offline (so they can login) and verified to true
+                    db.ref('deliveryBoys/' + mobile).update({ 
+                        status: 'offline', 
+                        verified: true,
+                        joinedAt: firebase.database.ServerValue.TIMESTAMP 
+                    }).then(() => {
+                        window.switchPartnerTab('active');
+                    });
+                }
+            }
+        });
+
+        // --- ACTIVE LIST CLICKS ---
         document.getElementById('active-list').addEventListener('click', (e) => {
             // PIN Toggle
             const pinBtn = e.target.closest('.toggle-pin');
@@ -257,7 +280,6 @@ export default {
         const manageModal = document.getElementById('manage-modal');
         document.getElementById('close-manage').addEventListener('click', () => manageModal.classList.add('hidden'));
 
-        // Direct WhatsApp Button (New Feature)
         document.getElementById('btn-wa-direct').addEventListener('click', () => {
              if(currentPartnerData && currentPartnerId) {
                 const url = `https://wa.me/91${currentPartnerId}`;
@@ -265,10 +287,9 @@ export default {
              }
         });
 
-        // Toggle Status
         document.getElementById('m-status-toggle').addEventListener('change', (e) => {
             const isChecked = e.target.checked;
-            const newStatus = isChecked ? 'offline' : 'disabled'; // Default to offline if enabled, agent must come online
+            const newStatus = isChecked ? 'offline' : 'disabled';
 
             document.getElementById('m-status-text').innerText = isChecked ? 'Partner is ACTIVE' : 'Partner is DISABLED';
             document.getElementById('m-status-text').className = isChecked ? 'text-xs font-bold text-green-500' : 'text-xs font-bold text-red-500';
@@ -276,28 +297,48 @@ export default {
             db.ref('deliveryBoys/' + currentPartnerId).update({ status: newStatus });
         });
 
-        // Open Recovery inside Manage
         document.getElementById('btn-open-recovery').addEventListener('click', () => {
             this.openRecoveryModal();
         });
 
-        // Settlement
+        // --- SETTLEMENT LOGIC (UPDATED: USES EARNINGS) ---
         document.getElementById('btn-settle').addEventListener('click', () => {
             const amountInput = document.getElementById('settle-amount');
             const amount = parseFloat(amountInput.value);
             if(!amount || amount <= 0) return alert("Enter valid amount");
 
-            const currentBal = parseFloat(document.getElementById('m-balance').innerText);
-            const newBal = currentBal - amount;
+            // Get Current Payable Earnings (Not Wallet Balance)
+            const currentPayable = parseFloat(document.getElementById('m-payable-earnings').innerText);
+            const newPayable = currentPayable - amount;
 
-            db.ref('deliveryBoys/' + currentPartnerId).update({ walletBalance: newBal }).then(() => {
+            // 1. Update Earnings (Reduces payable amount)
+            db.ref('deliveryBoys/' + currentPartnerId).update({ earnings: newPayable });
+
+            // 2. Add History Record (Keep this same)
+            const historyRef = db.ref('deliveryBoys/' + currentPartnerId + '/settlementHistory');
+            historyRef.push({
+                amount: amount,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
                 alert(`Settled ₹${amount}.`);
                 amountInput.value = '';
-                document.getElementById('m-balance').innerText = newBal;
+                // The on('value') listener will automatically update the UI number
+                // Refresh History list
+                this.renderHistory(currentPartnerId, db);
             });
         });
 
-        // Save Details
+        // --- VIEW HISTORY TOGGLE ---
+        document.getElementById('btn-view-history').addEventListener('click', () => {
+            const container = document.getElementById('history-container');
+            if(container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                this.renderHistory(currentPartnerId, db);
+            } else {
+                container.classList.add('hidden');
+            }
+        });
+
         document.getElementById('btn-save-details').addEventListener('click', () => {
             const newName = document.getElementById('edit-name').value;
             const newMobile = document.getElementById('edit-mobile-num').value;
@@ -310,7 +351,6 @@ export default {
             });
         });
 
-        // Delete
         document.getElementById('btn-delete-partner').addEventListener('click', () => {
             if(confirm("Permanently delete this partner?")) {
                 db.ref('deliveryBoys/' + currentPartnerId).remove();
@@ -318,7 +358,6 @@ export default {
             }
         });
 
-        // --- RECOVERY MODAL LOGIC ---
         const recModal = document.getElementById('rec-modal');
         document.getElementById('close-rec').addEventListener('click', () => recModal.classList.add('hidden'));
 
@@ -335,10 +374,45 @@ export default {
         });
     },
 
+    // --- RENDER HISTORY HELPER ---
+    renderHistory(id, db) {
+        const list = document.getElementById('history-container');
+        list.innerHTML = `<div class="text-center py-2"><i class="fa-solid fa-spinner fa-spin text-blue-500"></i></div>`;
+
+        db.ref('deliveryBoys/' + id + '/settlementHistory').limitToLast(10).once('value', snap => {
+            list.innerHTML = '';
+            if(!snap.exists()) {
+                list.innerHTML = `<p class="text-[10px] text-slate-400 text-center py-2">No history found.</p>`;
+                return;
+            }
+
+            const history = [];
+            snap.forEach(child => history.unshift(child.val())); // Reverse order
+
+            history.forEach(h => {
+                const date = new Date(h.timestamp).toLocaleDateString();
+                const time = new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                list.innerHTML += `
+                    <div class="flex justify-between items-center text-[10px] border-b border-slate-50 last:border-0 py-1.5 px-1">
+                        <div class="text-slate-500">
+                            <span class="font-bold text-slate-700">${date}</span> at ${time}
+                        </div>
+                        <div class="font-bold text-green-600">
+                            - ₹${h.amount}
+                        </div>
+                    </div>
+                `;
+            });
+        });
+    },
+
     openManageModal(id, p) {
         currentPartnerId = id;
         currentPartnerData = p; 
         const modal = document.getElementById('manage-modal');
+
+        document.getElementById('history-container').classList.add('hidden');
 
         // Basic Info
         document.getElementById('m-name').innerText = p.name;
@@ -346,9 +420,13 @@ export default {
         document.getElementById('m-pin-display').innerText = p.pin || '0000';
 
         // Stats
-        document.getElementById('m-earnings').innerText = p.earnings || 0;
+        // 1. Lifetime Earnings (Static/Cumulative)
+        document.getElementById('m-lifetime-earnings').innerText = p.lifetimeEarnings || 0;
+
+        // 2. Payable Earnings (Dynamic - Updated on settlement)
+        document.getElementById('m-payable-earnings').innerText = p.earnings || 0; 
+
         document.getElementById('m-online-status').innerText = (p.status || 'OFFLINE').toUpperCase();
-        document.getElementById('m-balance').innerText = p.walletBalance || 0;
 
         // Joined Date
         const joinDate = p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : 'Unknown';
@@ -403,6 +481,15 @@ export default {
             let pendingCount = 0;
             Object.entries(snap.val()).forEach(([mobile, p]) => {
                 if(!p.name) return;
+
+                // If manage modal is open for this partner, live update the values
+                if(!document.getElementById('manage-modal').classList.contains('hidden') && currentPartnerId === mobile) {
+                    if(document.getElementById('m-payable-earnings')) {
+                         document.getElementById('m-payable-earnings').innerText = p.earnings || 0;
+                         document.getElementById('m-lifetime-earnings').innerText = p.lifetimeEarnings || 0;
+                    }
+                }
+
                 if (p.status === 'pending') {
                     pendingCount++;
                     reqList.innerHTML += this.createRequestCard(mobile, p);
@@ -420,18 +507,16 @@ export default {
         });
     },
 
-    // --- CARD GENERATOR (LIGHT THEME + FEATURES) ---
     createActiveCard(mobile, p) {
         const isOnline = p.status === 'online';
         const safeJson = encodeURIComponent(JSON.stringify(p));
         const batteryVal = p.battery || 0;
         const pin = p.pin || '0000';
-        const lastSeen = this.getTimeAgo(p.lastHeartbeat); // Show on front card
+        const lastSeen = this.getTimeAgo(p.lastHeartbeat);
 
         let battColor = 'text-green-500';
         if(batteryVal < 30) battColor = 'text-red-500';
 
-        // Online Indicator Logic
         const statusDot = isOnline 
             ? `<span class="w-2.5 h-2.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></span>` 
             : `<span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>`;
@@ -440,7 +525,6 @@ export default {
 
         return `
             <div class="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md hover:border-blue-200 transition group relative overflow-hidden">
-
                 <div class="flex justify-between items-start">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 border border-slate-200">
@@ -469,7 +553,6 @@ export default {
                 </div>
 
                 <div class="flex items-center justify-between gap-3 mt-1">
-
                     <div class="flex items-center gap-2 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 w-fit">
                         <span class="font-mono text-xs tracking-widest text-slate-400 font-bold select-none">••••</span>
                         <button class="toggle-pin text-slate-400 hover:text-blue-600 transition text-[10px] outline-none" data-pin="${pin}">
@@ -487,6 +570,9 @@ export default {
     },
 
     createRequestCard(mobile, p) {
+        const vehicle = p.vehicle ? p.vehicle.toUpperCase() : 'UNKNOWN';
+        const joinDate = p.joinedAt ? new Date(p.joinedAt).toLocaleDateString() : 'Recently';
+
         return `
             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div class="flex justify-between items-start mb-2">
@@ -496,11 +582,23 @@ export default {
                     </div>
                     <span class="bg-amber-50 text-amber-600 text-[9px] font-bold px-2 py-0.5 rounded border border-amber-200">PENDING</span>
                 </div>
-                <div class="flex gap-2 mt-3">
+
+                <div class="flex items-center gap-4 my-3 text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-calendar-days text-slate-400"></i>
+                        <span>Joined: <b class="text-slate-700">${joinDate}</b></span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-bicycle text-slate-400"></i>
+                        <span>Vehicle: <b class="text-slate-700">${vehicle}</b></span>
+                    </div>
+                </div>
+
+                <div class="flex gap-2">
                     <a href="https://wa.me/91${mobile}" target="_blank" class="flex-1 bg-slate-50 border border-slate-200 text-slate-600 py-2 rounded-lg text-[10px] font-bold text-center hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition">
                         <i class="fa-brands fa-whatsapp mr-1"></i> Check
                     </a>
-                    <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-[10px] font-bold hover:bg-blue-700 shadow-md shadow-blue-100 transition" onclick="alert('Approve logic here')">
+                    <button class="btn-approve-request flex-1 bg-blue-600 text-white py-2 rounded-lg text-[10px] font-bold hover:bg-blue-700 shadow-md shadow-blue-100 transition" data-id="${mobile}">
                         APPROVE
                     </button>
                 </div>
