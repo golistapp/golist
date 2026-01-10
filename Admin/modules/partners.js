@@ -375,26 +375,34 @@ export default {
     },
 
     // --- RENDER HISTORY HELPER ---
+        // Is function ko partners.js me sabse niche (lekin export object ke andar) paste karo
     renderHistory(id, db) {
         const list = document.getElementById('history-container');
-        list.innerHTML = `<div class="text-center py-2"><i class="fa-solid fa-spinner fa-spin text-blue-500"></i></div>`;
+        if(!list) return;
 
+        list.innerHTML = `<div class="text-center py-2"><i class="fa-solid fa-spinner fa-spin text-blue-500"></i> Loading...</div>`;
+
+        // Database se history fetch karna
         db.ref('deliveryBoys/' + id + '/settlementHistory').limitToLast(10).once('value', snap => {
             list.innerHTML = '';
+
             if(!snap.exists()) {
                 list.innerHTML = `<p class="text-[10px] text-slate-400 text-center py-2">No history found.</p>`;
                 return;
             }
 
             const history = [];
-            snap.forEach(child => history.unshift(child.val())); // Reverse order
+            snap.forEach(child => {
+                history.unshift(child.val()); // Newest upar aayega
+            });
 
             history.forEach(h => {
-                const date = new Date(h.timestamp).toLocaleDateString();
-                const time = new Date(h.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const dateObj = new Date(h.timestamp);
+                const date = dateObj.toLocaleDateString();
+                const time = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
                 list.innerHTML += `
-                    <div class="flex justify-between items-center text-[10px] border-b border-slate-50 last:border-0 py-1.5 px-1">
+                    <div class="flex justify-between items-center text-[10px] border-b border-slate-50 last:border-0 py-2 px-1">
                         <div class="text-slate-500">
                             <span class="font-bold text-slate-700">${date}</span> at ${time}
                         </div>
@@ -406,6 +414,7 @@ export default {
             });
         });
     },
+
 
     openManageModal(id, p) {
         currentPartnerId = id;
