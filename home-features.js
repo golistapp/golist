@@ -756,34 +756,77 @@ function updatePin() {
 }
 
 // --- DYNAMIC CONTENT (Policies & Videos) ---
+
 function fetchDynamicContent(type) {
     const modal = document.getElementById('contentModal');
     const title = document.getElementById('contentTitle');
     const body = document.getElementById('contentBody');
 
     modal.classList.remove('hidden');
-    body.innerHTML = '<div class="text-center mt-10"><i class="fa-solid fa-spinner fa-spin text-2xl text-slate-300"></i></div>';
+
+    // Reset & Loading State
+    title.innerText = type === 'video' ? "How to Use App" : "Policies & Terms";
+    body.innerHTML = `
+        <div class="text-center mt-10">
+            <i class="fa-solid fa-spinner fa-spin text-2xl text-slate-300"></i>
+            <p class="text-xs font-bold text-slate-400 mt-2">Loading content...</p>
+        </div>`;
 
     if(type === 'policy') {
-        title.innerText = "Policies & Terms";
-        db.ref('admin/policies/about').once('value', snap => {
+        // Fetch ALL policies from database
+        db.ref('admin/policies').once('value', snap => {
             if(snap.exists()) {
-                body.innerHTML = snap.val();
+                const policies = snap.val();
+                const keys = Object.keys(policies);
+
+                // Name Mapping (Database Key -> Display Name)
+                const names = {
+                    'about': 'About Us',
+                    'privacy': 'Privacy Policy',
+                    'refund': 'Refund & Return',
+                    'terms': 'Terms of Use',
+                    'shipping': 'Shipping Info'
+                };
+
+                // 1. Create Navigation Tabs
+                let navHtml = '<div class="flex flex-wrap gap-2 mb-4 border-b border-slate-100 pb-3">';
+                let firstKey = keys[0];
+
+                keys.forEach((key, index) => {
+                    const displayName = names[key] || key.toUpperCase(); // Fallback to key if name not found
+                    const activeClass = index === 0 ? 'bg-golist text-white border-golist' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50';
+
+                    navHtml += `
+                        <button onclick="switchPolicyTab('${key}')" id="btn-pol-${key}" class="px-3 py-1.5 rounded-lg text-[10px] font-bold border transition ${activeClass}">
+                            ${displayName}
+                        </button>`;
+                });
+                navHtml += '</div>';
+
+                // 2. Create Content Area
+                let contentHtml = `<div id="policyTextContent" class="prose prose-sm text-slate-600 leading-relaxed text-xs"></div>`;
+
+                // 3. Inject HTML
+                body.innerHTML = navHtml + contentHtml;
+
+                // 4. Load First Policy
+                window.cachedPolicies = policies; // Store temporarily
+                switchPolicyTab(firstKey);
+
             } else {
-                body.innerHTML = "<p>No policies updated yet.</p>";
+                body.innerHTML = "<div class='text-center mt-10 opacity-50'><i class='fa-solid fa-file-circle-xmark text-4xl mb-2'></i><p>No policies updated yet.</p></div>";
             }
         });
     } 
     else if(type === 'video') {
-        title.innerText = "How to Use App";
-        // Fetch last added video
+        // (Video logic remains same)
         db.ref('admin/videos').limitToLast(1).once('value', snap => {
             if(snap.exists()) {
                 const data = Object.values(snap.val())[0];
                 const videoId = extractYouTubeID(data.link);
                 if(videoId) {
                     body.innerHTML = `
-                        <div class="aspect-video w-full rounded-xl overflow-hidden shadow-lg mb-4">
+                        <div class="aspect-video w-full rounded-xl overflow-hidden shadow-lg mb-4 bg-black">
                             <iframe class="w-full h-full" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
                         </div>
                         <h3 class="font-bold text-lg text-slate-800">${data.title}</h3>
@@ -799,6 +842,27 @@ function fetchDynamicContent(type) {
     }
 }
 
+// Helper Function to Switch Tabs
+function switchPolicyTab(key) {
+    const policies = window.cachedPolicies;
+    if(!policies || !policies[key]) return;
+
+    // Update Content
+    const contentBox = document.getElementById('policyTextContent');
+    contentBox.innerHTML = policies[key]; // HTML content from DB
+
+    // Update Button Styles
+    const allBtns = document.querySelectorAll('[id^="btn-pol-"]');
+    allBtns.forEach(btn => {
+        btn.className = "px-3 py-1.5 rounded-lg text-[10px] font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition";
+    });
+
+    const activeBtn = document.getElementById(`btn-pol-${key}`);
+    if(activeBtn) {
+        activeBtn.className = "px-3 py-1.5 rounded-lg text-[10px] font-bold border border-golist bg-golist text-white shadow-md transition";
+    }
+}
+
 function extractYouTubeID(url) {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
@@ -807,28 +871,11 @@ function extractYouTubeID(url) {
 
 function closeContentModal() {
     document.getElementById('contentModal').classList.add('hidden');
+    window.cachedPolicies = null; // Clear cache
 }
 
-// Global Exports for New Features
-window.openAddModal = openAddModal;
-window.closeAddModal = closeAddModal;
-window.saveProduct = saveProduct;
-window.openHistory = openHistory;
-window.viewOrderInvoice = viewOrderInvoice;
-window.closeInvoiceModal = closeInvoiceModal;
-window.downloadInvoiceAsImage = downloadInvoiceAsImage;
-window.checkActiveOrderHome = checkActiveOrderHome;
-window.openTrackingModal = openTrackingModal;
-window.closeTrackingModal = closeTrackingModal;
-window.shareStore = shareStore;
-window.openSupportOptions = openSupportOptions;
-
-// New Exports
-window.openAddressModal = openAddressModal;
-window.closeAddressModal = closeAddressModal;
-window.saveAddress = saveAddress;
-window.openPinModal = openPinModal;
-window.closePinModal = closePinModal;
-window.updatePin = updatePin;
+// Global Exports
+// ... (Keep existing exports) ...
 window.fetchDynamicContent = fetchDynamicContent;
+window.switchPolicyTab = switchPolicyTab; // NEW EXPORT
 window.closeContentModal = closeContentModal;

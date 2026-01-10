@@ -71,8 +71,6 @@ function toggleMenu() {
     document.getElementById('menuOverlay').classList.toggle('open'); 
 }
 
-// (Old getEmoji Function Removed - Now using getProductIcon from home-icons.js)
-
 // --- 1. SETUP & MENU ---
 function setupHeader() {
     if(session) {
@@ -86,43 +84,27 @@ function setupHeader() {
 
 function setupSideMenu() {
     const nav = document.getElementById('sidebarNav');
+
+    // Cleaned up Menu: Only Add Product, History, Profile & Settings, Logout
     let html = `
         <button onclick="toggleMenu(); openAddModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-plus text-golist w-5 text-lg"></i> Add Product
         </button>
 
         <button onclick="openHistory()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-solid fa-clock-rotate-left text-blue-600 w-5"></i> Order History
+            <i class="fa-solid fa-clock-rotate-left text-blue-600 w-5 text-lg"></i> Order History
         </button>
 
         <div class="h-px bg-slate-100 my-1 mx-4"></div>
 
-        <button onclick="toggleMenu(); openAddressModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-solid fa-location-dot text-indigo-500 w-5"></i> My Address
-        </button>
-
-        <button onclick="toggleMenu(); openPinModal()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-solid fa-key text-orange-500 w-5"></i> Change PIN
-        </button>
-
-        <div class="h-px bg-slate-100 my-1 mx-4"></div>
-
-        <button onclick="toggleMenu(); fetchDynamicContent('video')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-brands fa-youtube text-red-500 w-5"></i> How to Use App
-        </button>
-
-        <button onclick="openSupportOptions()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-golist font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-brands fa-whatsapp w-5 text-xl"></i> Contact Support
-        </button>
-
-        <button onclick="toggleMenu(); fetchDynamicContent('policy')" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-solid fa-shield-halved text-slate-400 w-5"></i> Policies & Terms
+        <button onclick="toggleMenu(); openProfileSettings()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
+            <i class="fa-solid fa-user-gear text-slate-500 w-5 text-lg"></i> Profile & Settings
         </button>
 
         <div class="h-px bg-slate-100 my-1 mx-4"></div>
 
         <button onclick="logout()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-red-50 text-red-500 font-bold text-sm flex items-center gap-3 transition">
-            <i class="fa-solid fa-power-off w-5"></i> Logout
+            <i class="fa-solid fa-power-off w-5 text-lg"></i> Logout
         </button>
     `;
     nav.innerHTML = html;
@@ -240,7 +222,7 @@ function loadRecentOrders() {
             if(masterMatch && masterMatch.image) {
                  imageHtml = `<img src="${masterMatch.image}" class="w-full h-full object-cover rounded-full">`;
             } else {
-                 // UPDATED: Using New Icon System
+                 // Using New Icon System
                  imageHtml = window.getProductIcon ? window.getProductIcon(item.name) : '📦';
             }
 
@@ -352,7 +334,7 @@ function renderList(products) {
         if(masterMatch && masterMatch.image) {
             imageContent = `<img src="${masterMatch.image}" class="w-full h-full object-cover">`;
         } else {
-            // UPDATED: Using New Icon System
+            // Using New Icon System
             imageContent = window.getProductIcon ? window.getProductIcon(item.name) : '📦';
         }
 
@@ -501,5 +483,4 @@ window.confirmBulkDelete = confirmBulkDelete;
 window.toggleDeleteItem = toggleDeleteItem;
 window.toggleMenu = toggleMenu;
 window.logout = logout;
-window.openSupportOptions = openSupportOptions; 
 window.setupSideMenu = setupSideMenu; 
