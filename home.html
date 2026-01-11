@@ -56,7 +56,7 @@
 </head>
 <body class="text-slate-800 antialiased pb-28">
 
-       <header class="bg-white sticky top-0 z-30 shadow-sm">
+          <header class="bg-white sticky top-0 z-30 shadow-sm select-none">
         <div class="px-4 h-14 flex items-center justify-between bg-white">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMenu()" class="text-slate-500 hover:text-golist transition">
@@ -69,17 +69,17 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <button id="installAppBtn" onclick="window.installPWA()" class="hidden bg-slate-900 text-white px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-md animate-bounce hover:bg-black transition border border-slate-800">
-                    <i class="fa-solid fa-download"></i> <span class="hidden sm:inline">Install App</span>
+                <button id="installAppBtn" onclick="window.installPWA()" class="hidden bg-slate-900 text-white px-3 py-1.5 rounded-full text-[10px] font-bold flex items-center gap-1.5 shadow-md install-anim border border-green-500 hover:bg-black transition cursor-pointer select-none">
+                    <i class="fa-solid fa-download animate-bounce"></i> <span>Install App</span>
                 </button>
 
-                <button onclick="openProfileWrapper('support')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                <button onclick="openProfileWrapper('support')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition select-none">
                     <i class="fa-brands fa-whatsapp text-golist text-sm"></i> Support
                 </button>
             </div>
         </div>
         
-        <div class="delivery-gradient px-4 py-1.5 flex justify-between items-center text-[10px] font-medium shadow-sm">
+        <div class="delivery-gradient px-4 py-1.5 flex justify-between items-center text-[10px] font-medium shadow-sm select-none">
             <span class="flex items-center gap-2 font-bold tracking-wide">
                 <i class="fa-solid fa-truck-fast text-white"></i> Delivery within 24 hours
             </span>
@@ -88,6 +88,7 @@
             </span>
         </div>
     </header>
+
 
 
     <div id="searchSection" class="bg-white pb-1 pt-2 px-4 shadow-sm mb-2 rounded-b-3xl sticky top-0 z-40 transition-all duration-300">
