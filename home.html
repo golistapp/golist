@@ -45,6 +45,13 @@
         .timeline-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #cbd5e1; border: 2px solid white; box-shadow: 0 0 0 2px #cbd5e1; }
         .timeline-dot.active { background-color: #369152; box-shadow: 0 0 0 2px #dcfce7; }
         .locked-input { background-color: #f1f5f9; color: #64748b; pointer-events: none; border-color: #e2e8f0; user-select: none; }
+        /* MISSING ANIMATION FIX */
+        @keyframes fadeIn { 
+            from { opacity: 0; transform: translateY(10px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
+       
+
     </style>
 </head>
 <body class="text-slate-800 antialiased pb-28">
@@ -158,6 +165,19 @@
                 <p class="text-xs mt-2 font-medium text-slate-400">Loading Products...</p>
             </div>
         </ul>
+        <div id="scrollLoader" class="hidden py-4 text-center w-full clear-both">
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-white rounded-full shadow-sm border border-slate-100">
+                <i class="fa-solid fa-circle-notch fa-spin text-golist text-xs"></i>
+                <span class="text-[10px] font-bold text-slate-500">Loading more...</span>
+            </div>
+        </div>
+
+        <div id="endOfList" class="hidden py-8 text-center opacity-50 w-full clear-both">
+            <i class="fa-regular fa-circle-check text-xl text-slate-300 mb-1"></i>
+            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">All Items Loaded</p>
+        </div>
+
+        
 
         <div id="bottomAddLink" onclick="openAddModalWrapper()" class="mt-4 border-2 border-dashed border-slate-200 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-slate-50 transition">
             <i class="fa-solid fa-plus text-sm"></i>
