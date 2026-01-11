@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GoList Store</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golist: '#369152',
+                        golistDark: '#2d7a44',
+                        golistLight: '#e6f4ea'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f4f6f8; -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        html { scroll-behavior: smooth; }
+        @keyframes floatUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-float { animation: floatUp 0.3s ease-out forwards; }
+        .sidebar { transform: translateX(-100%); transition: transform 0.3s ease-in-out; }
+        .sidebar.open { transform: translateX(0); }
+        .overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .overlay.open { opacity: 1; pointer-events: auto; }
+        .delivery-gradient { background: linear-gradient(90deg, #369152 0%, #369152 50%, rgba(255,255,255,0) 100%); color: white; }
+        .timeline-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #cbd5e1; border: 2px solid white; box-shadow: 0 0 0 2px #cbd5e1; }
+        .timeline-dot.active { background-color: #369152; box-shadow: 0 0 0 2px #dcfce7; }
+        .locked-input { background-color: #f1f5f9; color: #64748b; pointer-events: none; border-color: #e2e8f0; user-select: none; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased pb-28">
+
+    <header id="topHeader" class="bg-white z-30 shadow-sm transition-all duration-300">
+        <div class="px-4 h-14 flex items-center justify-between bg-white">
+            <div class="flex items-center gap-3">
+                <button onclick="toggleMenu()" class="text-slate-500 hover:text-golist transition">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <div class="flex items-center gap-1">
+                    <i class="fa-solid fa-location-dot text-golist text-lg"></i>
+                    <h1 id="headerShopName" class="text-2xl font-extrabold text-golist tracking-tight">GoList</h1>
+                </div>
+            </div>
+            <button onclick="openSupportOptions()" class="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+                <i class="fa-brands fa-whatsapp text-golist text-sm"></i> Support
+            </button>
+        </div>
+        <div class="delivery-gradient px-4 py-1.5 flex justify-between items-center text-[10px] font-medium shadow-sm">
+            <span class="flex items-center gap-2 font-bold tracking-wide">
+                <i class="fa-solid fa-truck-fast text-white"></i> Delivery within 24 hours
+            </span>
+           <span onclick="window.location.href='master-catalog.html'" class="cursor-pointer text-golist font-bold text-[9px] bg-white/90 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm hover:bg-green-50 transition active:scale-95">
+    Local Fresh Stock <i class="fa-solid fa-chevron-right text-[8px]"></i>
+</span>
+
+        </div>
+    </header>
+
+    <div id="searchSection" class="bg-white pb-1 pt-2 px-4 shadow-sm mb-2 rounded-b-3xl sticky top-0 z-40 transition-all duration-300">
+        <div class="relative mb-2 transition-all duration-300" id="searchBoxWrapper">
+            <input type="text" id="searchInput" placeholder="E.g. 2 kg aloo, 1 shampoo..." class="w-full bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-xl py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-golist focus:border-transparent placeholder:text-slate-400 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] transition-all">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+            <button id="searchCloseBtn" onclick="disableSearchMode()" class="hidden absolute right-2 top-1.5 w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+
+        <div id="homeOptions" class="transition-all duration-300 overflow-hidden max-h-[200px] opacity-100">
+            <div class="flex overflow-x-auto no-scrollbar gap-1 pb-1" id="categoryList">
+                <div class="flex flex-col items-center gap-1 min-w-[60px] opacity-50">
+                    <div class="w-12 h-12 bg-slate-100 rounded-xl animate-pulse"></div>
+                </div>
+            </div>
+            <button onclick="openAddModalWrapper()" class="w-full mt-1 mb-1 bg-golist hover:bg-golistDark text-white font-bold py-2.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-plus"></i> Add Custom Item
+            </button>
+        </div>
+    </div>
+
+    <div id="homeBanners" class="transition-all duration-300">
+        <div id="liveOrderBanner" onclick="openTrackingModal()" class="hidden mx-4 mb-3 bg-white rounded-xl p-3 shadow-md border-l-4 border-blue-500 flex items-center justify-between animate-float cursor-pointer">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                    <i class="fa-solid fa-motorcycle text-blue-600 animate-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">Active Order</p>
+                    <h3 class="font-bold text-slate-800 text-sm" id="bannerStatus">Processing...</h3>
+                </div>
+            </div>
+            <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+        </div>
+
+        <div id="recentSection" class="mb-2 px-4 py-1 hidden">
+            <div class="flex justify-between items-end mb-2">
+                <h2 class="text-sm font-bold text-slate-800">Recent Orders</h2>
+                <span class="text-[10px] text-slate-400 font-medium cursor-pointer" onclick="openHistoryWrapper()">View History <i class="fa-solid fa-chevron-right"></i></span>
+            </div>
+            <div class="flex overflow-x-auto no-scrollbar gap-2 pb-2" id="recentList"></div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-t-3xl min-h-[60vh] px-4 pt-4 pb-24 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] relative" id="mainProductContainer">
+        <div id="listHeader" class="flex justify-between items-center mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-50 transition-all">
+            <div>
+                <h2 class="text-base font-extrabold text-slate-800">Add to List</h2>
+                <p class="text-[10px] text-slate-400 font-medium" id="listSubHeader">Showing all items</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="shareStore()" class="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-golist hover:bg-green-50 flex items-center justify-center border border-slate-100 transition">
+                    <i class="fa-solid fa-share-nodes text-xs"></i>
+                </button>
+                <div class="h-4 w-px bg-slate-200 mx-1"></div>
+                <button onclick="toggleEditMode()" id="btnEditMode" class="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 flex items-center justify-center border border-slate-100 transition">
+                    <i class="fa-solid fa-pencil text-xs"></i>
+                </button>
+                <button onclick="toggleDeleteMode()" id="btnDeleteMode" class="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center border border-slate-100 transition">
+                    <i class="fa-solid fa-trash text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="bulkDeleteAction" class="hidden mb-3 bg-red-50 p-3 rounded-xl flex justify-between items-center animate-float border border-red-100">
+            <span class="text-xs font-bold text-red-600">Select items to remove</span>
+            <button onclick="confirmBulkDelete()" class="bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm">DELETE</button>
+        </div>
+
+        <ul id="productList" class="space-y-2">
+            <div class="text-center py-10 opacity-50">
+                <i class="fa-solid fa-spinner fa-spin text-2xl text-slate-300"></i>
+                <p class="text-xs mt-2 font-medium text-slate-400">Loading Products...</p>
+            </div>
+        </ul>
+
+        <div id="bottomAddLink" onclick="openAddModalWrapper()" class="mt-4 border-2 border-dashed border-slate-200 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-slate-50 transition">
+            <i class="fa-solid fa-plus text-sm"></i>
+            <span class="font-bold text-xs">Add your own item...</span>
+        </div>
+    </div>
+
+    <div id="bottomBar" class="fixed bottom-4 left-4 right-4 z-40 hidden animate-float">
+        <div class="bg-white rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.15)] p-2 pr-3 flex items-center justify-between border border-slate-100">
+            <div class="flex items-center gap-3 pl-2">
+                <div class="w-9 h-9 rounded-full bg-golist text-white flex items-center justify-center shadow-md">
+                    <i class="fa-solid fa-check text-sm"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wide"><span id="barCount">0</span> Items</span>
+                    <span class="text-sm font-extrabold text-slate-800">₹<span id="barTotal">0</span></span>
+                </div>
+            </div>
+            <button onclick="window.location.href='cart.html'" class="bg-golist hover:bg-golistDark text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-md active:scale-95 transition flex items-center gap-2">
+                ORDER NOW <i class="fa-solid fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <div id="profileSettingsModal" class="hidden fixed inset-0 z-[60]"></div>
+
+    <div id="addStockModal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-end justify-center">
+        <div class="absolute inset-0" onclick="closeAddModal()"></div>
+        <div class="bg-white w-full max-w-md rounded-t-3xl p-5 shadow-2xl transform transition-transform duration-300 translate-y-full relative" id="addStockCard">
+            <div class="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4"></div>
+            <div class="flex justify-between items-center mb-2">
+                <h3 class="font-bold text-lg text-slate-800">Add New Item</h3>
+                <button onclick="closeAddModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="masterProductBadge" class="hidden bg-blue-50 text-blue-600 px-3 py-2 rounded-lg text-[10px] font-bold mb-3 flex items-center gap-2 border border-blue-100 animate-pulse">
+                <i class="fa-solid fa-circle-check"></i> Live Market Product (Verified)
+            </div>
+            <div id="suggestionBox" class="flex flex-wrap gap-2 mb-4 max-h-[60px] overflow-y-auto no-scrollbar"></div>
+            <div class="space-y-3">
+                <div class="relative">
+                    <input type="text" id="inpProdName" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-golist focus:border-transparent placeholder:font-normal" placeholder="e.g. Potato / Aloo">
+                    <i class="fa-solid fa-magnifying-glass absolute right-4 top-3.5 text-slate-300"></i>
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div class="relative">
+                        <select id="inpProdCat" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-golist appearance-none text-slate-700 truncate pr-6">
+                            <option value="" disabled selected>Category</option>
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-2 top-3.5 text-slate-400 text-[10px] pointer-events-none"></i>
+                    </div>
+                    <div class="relative">
+                        <span class="absolute left-3 top-3 text-slate-400 font-bold text-xs">₹</span>
+                        <input type="text" id="inpProdPrice" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-6 pr-2 py-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-golist" placeholder="0">
+                    </div>
+                    <div class="relative">
+                        <select id="inpProdUnit" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-golist appearance-none text-slate-700 truncate pr-6">
+                        </select>
+                        <i class="fa-solid fa-chevron-down absolute right-2 top-3.5 text-slate-400 text-[10px] pointer-events-none"></i>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between bg-slate-50 rounded-xl p-2 border border-slate-100">
+                    <span class="text-xs font-bold text-slate-500 ml-2 uppercase">Set Qty</span>
+                    <div class="flex items-center gap-3">
+                        <button onclick="adjustModalQty(-1)" class="w-10 h-10 rounded-lg bg-white shadow-sm border border-slate-200 text-slate-600 active:scale-95 text-lg font-bold hover:text-golist transition">-</button>
+                        <input type="text" id="inpProdQtyDisplay" readonly class="w-20 bg-transparent text-center text-lg font-extrabold text-slate-800 focus:outline-none cursor-default" value="1 kg">
+                        <button onclick="adjustModalQty(1)" class="w-10 h-10 rounded-lg bg-white shadow-sm border border-slate-200 text-slate-600 active:scale-95 text-lg font-bold hover:text-golist transition">+</button>
+                    </div>
+                </div>
+                <button onclick="saveProduct()" class="w-full bg-golist hover:bg-golistDark text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition text-sm tracking-wide mt-2">
+                    ADD TO LIST
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="menuOverlay" class="overlay fixed inset-0 bg-black/60 z-40 backdrop-blur-sm" onclick="toggleMenu()"></div>
+    <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[80%] max-w-[280px] bg-white z-50 shadow-2xl flex flex-col">
+        <div class="p-6 bg-golist text-white relative">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-full border-2 border-white/30 overflow-hidden bg-white/10">
+                    <img id="profileImg" src="https://via.placeholder.com/150" class="w-full h-full object-cover">
+                </div>
+                <div>
+                    <h2 class="font-bold text-base leading-tight" id="menuName">Guest</h2>
+                    <p class="text-xs text-green-100 font-mono" id="menuMobile">+91 ...</p>
+                </div>
+            </div>
+            <label class="absolute bottom-4 right-4 bg-white/20 hover:bg-white/30 text-white w-7 h-7 rounded-full flex items-center justify-center cursor-pointer transition">
+                <i class="fa-solid fa-camera text-[10px]"></i>
+                <input type="file" id="logoInput" class="hidden" accept="image/*" onchange="uploadCompressedLogo()">
+            </label>
+        </div>
+        <nav class="flex-1 p-2 space-y-1 overflow-y-auto" id="sidebarNav"></nav>
+        <div class="p-4 border-t border-slate-100 bg-slate-50 text-center">
+            <p class="text-[10px] text-slate-400">GoList v2.5 • Powered by Ramazone</p>
+        </div>
+    </div>
+
+    <div id="supportModal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-6 relative">
+            <div class="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4 text-golist">
+                <i class="fa-brands fa-whatsapp text-2xl"></i>
+            </div>
+            <h3 class="text-center text-xl font-bold text-slate-800">Contact Support</h3>
+            <p class="text-center text-xs text-slate-500 mb-6 mt-1">How can we help you today?</p>
+            <div class="space-y-3">
+                <button onclick="sendSupportMsg('Order Related')" class="w-full bg-white border border-slate-200 hover:border-golist hover:bg-green-50 text-slate-700 font-bold py-3.5 rounded-xl flex items-center justify-between px-4 transition">
+                    <span class="flex items-center gap-3"><i class="fa-solid fa-box-open text-golist"></i> Order Related Problem</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-300"></i>
+                </button>
+                <button onclick="sendSupportMsg('Delivery Boy Related')" class="w-full bg-white border border-slate-200 hover:border-golist hover:bg-green-50 text-slate-700 font-bold py-3.5 rounded-xl flex items-center justify-between px-4 transition">
+                    <span class="flex items-center gap-3"><i class="fa-solid fa-motorcycle text-golist"></i> Delivery Boy Related</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-300"></i>
+                </button>
+                <button onclick="sendSupportMsg('Other Issue')" class="w-full bg-white border border-slate-200 hover:border-golist hover:bg-green-50 text-slate-700 font-bold py-3.5 rounded-xl flex items-center justify-between px-4 transition">
+                    <span class="flex items-center gap-3"><i class="fa-solid fa-comment-dots text-golist"></i> Other Problem</span>
+                    <i class="fa-solid fa-chevron-right text-xs text-slate-300"></i>
+                </button>
+            </div>
+            <button onclick="document.getElementById('supportModal').classList.add('hidden')" class="w-full mt-6 text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-slate-600">Cancel</button>
+        </div>
+    </div>
+
+    <div id="trackingModal" class="hidden fixed inset-0 z-[60] bg-slate-50 flex flex-col h-full animate-[fadeIn_0.2s_ease-out]">
+        <div class="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
+            <div>
+                <h3 class="text-sm font-bold opacity-80">ORDER #<span id="modalOrderId">...</span></h3>
+                <p class="text-[10px] font-bold text-green-400 uppercase tracking-wider">Live Status Update</p>
+            </div>
+            <button onclick="closeTrackingModal()" class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-5 relative overflow-hidden">
+                 <div class="absolute left-[33px] top-6 bottom-6 w-0.5 bg-slate-100 z-0"></div>
+                 <div id="modalTimeline" class="relative z-10 space-y-6"></div>
+            </div>
+            <div id="modalPartnerCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center text-golist text-xl border border-green-100"><i class="fa-solid fa-motorcycle"></i></div>
+                    <div>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase">Delivery Partner</p>
+                        <h4 class="font-bold text-slate-800 text-sm" id="modalPartnerName">Finding Partner...</h4>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <a id="btnCallPartner" href="#" class="flex items-center justify-center gap-2 py-2.5 rounded-lg border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50"><i class="fa-solid fa-phone"></i> Call</a>
+                    <a id="btnChatPartner" href="#" target="_blank" class="flex items-center justify-center gap-2 py-2.5 rounded-lg bg-green-50 text-golist font-bold text-xs border border-green-100 hover:bg-green-100"><i class="fa-brands fa-whatsapp text-sm"></i> Chat</a>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+                <h4 class="text-xs font-bold text-slate-400 uppercase mb-3 flex justify-between"><span>Ordered Items</span><i class="fa-solid fa-basket-shopping"></i></h4>
+                <div id="modalItemsList" class="space-y-0.5"></div>
+                <div class="border-t border-slate-100 mt-3 pt-3 flex justify-between items-center">
+                    <span class="text-xs font-bold text-slate-600">Total Bill</span>
+                    <span class="text-sm font-extrabold text-slate-900">₹<span id="modalTotal">0</span></span>
+                </div>
+            </div>
+            <button onclick="closeTrackingModal(); openSupportOptions()" class="w-full py-3 text-xs font-bold text-slate-400 hover:text-golist transition uppercase tracking-wide">Need Help? Contact Support</button>
+        </div>
+    </div>
+
+    <div id="historyModal" class="hidden fixed inset-0 z-[60] bg-slate-50 flex flex-col h-full animate-[fadeIn_0.2s_ease-out]">
+        <div class="bg-white px-4 py-3 flex justify-between items-center shadow-sm border-b border-slate-100 z-10">
+            <h3 class="font-bold text-lg text-slate-800">Order History</h3>
+            <button onclick="document.getElementById('historyModal').classList.add('hidden')" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:text-golist flex items-center justify-center transition"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="text-center mt-10 opacity-50">
+                <i class="fa-solid fa-clock-rotate-left text-4xl text-slate-300 mb-2"></i>
+                <p class="text-xs font-bold text-slate-400">Loading History...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="invoiceModal" class="hidden fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white w-full max-w-sm rounded-xl shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+            <div class="bg-slate-900 p-3 flex justify-between items-center text-white">
+                <h3 class="font-bold text-sm">Order Invoice</h3>
+                <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="invoiceCaptureArea" class="bg-white p-6 relative">
+                <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 opacity-[0.03] pointer-events-none"><i class="fa-solid fa-store text-9xl"></i></div>
+                <div class="text-center border-b border-slate-100 pb-4 mb-4">
+                    <h1 class="text-2xl font-extrabold text-golist tracking-tight uppercase" id="invShopName">My Shop</h1>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Official Tax Invoice</p>
+                </div>
+                <div class="flex justify-between items-end mb-6 text-xs">
+                    <div>
+                        <p class="text-slate-400 font-bold">Billed To:</p>
+                        <p class="font-bold text-slate-800 text-sm" id="invCustName">Customer Name</p>
+                        <p class="text-[10px] text-slate-500" id="invCustMobile">+91 XXXXXXXX</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-mono font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded mb-1 inline-block" id="invOrderId">#ORD-000</p>
+                        <p class="text-[10px] text-slate-400 font-bold" id="invDate">01 Jan 2024</p>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <div class="flex border-b-2 border-slate-100 pb-2 mb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        <div class="flex-1">Item</div>
+                        <div class="w-12 text-center">Qty</div>
+                        <div class="w-16 text-right">Price</div>
+                    </div>
+                    <div id="invItemsList" class="space-y-2 min-h-[100px]"></div>
+                </div>
+                <div class="bg-slate-50 rounded-lg p-3 space-y-2 mb-4">
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <span>Subtotal</span>
+                        <span class="font-bold">₹<span id="invSubTotal">0</span></span>
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <span>Delivery Fee</span>
+                        <span class="font-bold">₹<span id="invDelFee">0</span></span>
+                    </div>
+                    <div class="border-t border-slate-200 pt-2 flex justify-between text-sm font-extrabold text-slate-800">
+                        <span>Grand Total</span>
+                        <span>₹<span id="invGrandTotal">0</span></span>
+                    </div>
+                </div>
+                <div class="border-t border-slate-100 pt-4 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-full bg-green-50 text-golist flex items-center justify-center text-xs"><i class="fa-solid fa-user-check"></i></div>
+                        <div>
+                            <p class="text-[9px] text-slate-400 font-bold uppercase">Delivery Partner</p>
+                            <p class="text-xs font-bold text-slate-800" id="invPartnerName">Not Assigned</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=Verified" class="w-10 h-10 opacity-80 mix-blend-multiply ml-auto">
+                        <p class="text-[8px] text-golist font-bold mt-1">VERIFIED</p>
+                    </div>
+                </div>
+                 <p class="text-[8px] text-center text-slate-300 mt-6 font-mono">Generated by Ramazone System</p>
+            </div>
+            <div class="p-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-3">
+                 <button onclick="closeInvoiceModal()" class="w-full py-3 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-white transition">Close</button>
+                 <button onclick="downloadInvoiceAsImage()" class="w-full py-3 rounded-xl bg-golist text-white font-bold text-xs shadow-lg shadow-green-200 hover:bg-golistDark transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> Download Bill
+                 </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addressModal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5 animate-[fadeIn_0.2s_ease-out]">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <i class="fa-solid fa-location-dot"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">My Address</h3>
+                    <p class="text-[10px] text-slate-400 font-bold">Where should we deliver?</p>
+                </div>
+            </div>
+            <textarea id="inpAddress" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-golist h-28 resize-none font-medium" placeholder="Enter your full address (House No, Street, Landmark)..."></textarea>
+            <div class="flex gap-2 mt-4">
+                <button onclick="closeAddressModal()" class="flex-1 py-3 text-slate-500 font-bold text-xs bg-slate-100 rounded-xl hover:bg-slate-200 transition">Cancel</button>
+                <button onclick="saveAddress()" class="flex-1 py-3 text-white font-bold text-xs bg-golist rounded-xl shadow-lg shadow-green-200 hover:bg-golistDark transition">Save Address</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pinModal" class="hidden fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl p-5 animate-[fadeIn_0.2s_ease-out]">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-500">
+                    <i class="fa-solid fa-key"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">Change PIN</h3>
+                    <p class="text-[10px] text-slate-400 font-bold">Secure your shop access</p>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">New 4-Digit PIN</label>
+                    <input type="tel" id="inpNewPin" maxlength="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xl font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-golist">
+                </div>
+                <div>
+                    <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Confirm PIN</label>
+                    <input type="tel" id="inpConfirmPin" maxlength="4" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xl font-bold tracking-[0.5em] text-center focus:outline-none focus:ring-2 focus:ring-golist">
+                </div>
+            </div>
+            <div class="flex gap-2 mt-6">
+                <button onclick="closePinModal()" class="flex-1 py-3 text-slate-500 font-bold text-xs bg-slate-100 rounded-xl hover:bg-slate-200 transition">Cancel</button>
+                <button onclick="updatePin()" class="flex-1 py-3 text-white font-bold text-xs bg-golist rounded-xl shadow-lg shadow-green-200 hover:bg-golistDark transition">Update PIN</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="contentModal" class="hidden fixed inset-0 z-[60] bg-slate-50 flex flex-col h-full animate-[fadeIn_0.2s_ease-out]">
+        <div class="bg-white px-4 py-3 flex justify-between items-center shadow-sm border-b border-slate-100 z-10">
+            <h3 id="contentTitle" class="font-bold text-lg text-slate-800">Information</h3>
+            <button onclick="closeContentModal()" class="w-8 h-8 rounded-full bg-slate-50 text-slate-500 hover:text-golist flex items-center justify-center transition">
+                 <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="contentBody" class="flex-1 overflow-y-auto p-4 space-y-3 prose prose-sm max-w-none text-slate-600">
+            </div>
+    </div>
+
+    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-5 py-2.5 rounded-full shadow-2xl z-[120] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex gap-2 items-center min-w-[150px] justify-center">
+        <i class="fa-solid fa-check-circle text-golist"></i>
+        <span id="toastMsg">Updated</span>
+    </div>
+
+    <script src="core/firebase-config.js"></script>
+    <script src="modules/icons.js"></script>
+    <script src="core/app.js"></script>
+
+</body>
+</html>
