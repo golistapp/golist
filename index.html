@@ -21,6 +21,8 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
+    <script src="core/firebase-config.js"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -69,9 +71,9 @@
             </div>
 
            <div onclick="showShopLogin()" class="option-card bg-white p-6 rounded-2xl shadow-lg border border-slate-100 cursor-pointer flex items-center gap-5 hover:border-green-200 hover:shadow-xl group">
-    <div class="w-14 h-14 rounded-full bg-golistLight flex items-center justify-center shadow-sm shrink-0 group-hover:bg-golist transition">
-        <img src="https://ik.imagekit.io/kdtvm0r78/1000125737_X6opgWvzIj.png" alt="List Icon" class="w-14 h-14 object-contain">
-    </div>
+                <div class="w-14 h-14 rounded-full bg-golistLight flex items-center justify-center shadow-sm shrink-0 group-hover:bg-golist transition">
+                    <img src="https://ik.imagekit.io/kdtvm0r78/1000125737_X6opgWvzIj.png" alt="List Icon" class="w-14 h-14 object-contain">
+                </div>
 
                 <div>
                     <h3 class="font-bold text-slate-800 text-lg group-hover:text-golist transition">Create My List</h3>
@@ -128,7 +130,7 @@
                     <div id="newUserDataFields" class="hidden space-y-4 animate-[fadeIn_0.3s_ease-out]">
                         <div class="input-group">
                             <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner Name</label>
-                            <input type="text" id="ownerName" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-golist focus:bg-white font-semibold" placeholder="Ex: Prince Rama">
+                            <input type="text" id="ownerName" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-golist focus:bg-white font-semibold" placeholder="Ex: Rahul Sharma">
                         </div>
                         
                         <div class="p-3 bg-green-50 rounded-xl border border-green-100">
@@ -233,19 +235,6 @@
     </div>
 
     <script>
-        // --- FIREBASE CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyCmgMr4cj7ec1B09eu3xpRhCwsVCeQR9v0",
-            authDomain: "tipsplit-e3wes.firebaseapp.com",
-            databaseURL: "https://tipsplit-e3wes-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "tipsplit-e3wes",
-            storageBucket: "tipsplit-e3wes.firebasestorage.app",
-            messagingSenderId: "984733883633",
-            appId: "1:984733883633:web:adc1e1d22b629a6b631d50"
-        };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
         // --- AUTH CHECK ---
         const existingUser = localStorage.getItem('rmz_user');
         if (existingUser) {
@@ -284,7 +273,8 @@
             const mobile = mobileInput.value;
             if (mobile.length === 10) {
                 typingTimer = setTimeout(() => {
-                    db.ref('users/' + mobile).once('value').then((snapshot) => {
+                    // Use window.db instead of const db
+                    window.db.ref('users/' + mobile).once('value').then((snapshot) => {
                         if (snapshot.exists()) {
                             // User exists - Hide extra fields
                             newUserFields.classList.add('hidden');
@@ -317,7 +307,8 @@
             btnText.style.display = 'none';
 
             try {
-                const userRef = db.ref('users/' + mobile);
+                // Use window.db here
+                const userRef = window.db.ref('users/' + mobile);
                 const snapshot = await userRef.once('value');
 
                 if (snapshot.exists()) {
@@ -398,7 +389,8 @@
             btn.innerHTML = 'Checking...';
             btn.disabled = true;
 
-            db.ref('users/' + recoveryMobile).once('value').then(snap => {
+            // Use window.db here
+            window.db.ref('users/' + recoveryMobile).once('value').then(snap => {
                 btn.innerHTML = 'Proceed';
                 btn.disabled = false;
 

@@ -46,7 +46,7 @@
 </head>
 <body class="text-slate-800 antialiased pb-28">
 
-    <header class="bg-white sticky top-0 z-30 shadow-sm">
+       <header class="bg-white sticky top-0 z-30 shadow-sm">
         <div class="px-4 h-14 flex items-center justify-between bg-white">
             <div class="flex items-center gap-3">
                 <button onclick="toggleMenu()" class="text-slate-500 hover:text-golist transition">
@@ -57,7 +57,7 @@
                     <h1 id="headerShopName" class="text-2xl font-extrabold text-golist tracking-tight">GoList</h1>
                 </div>
             </div>
-            <button onclick="openSupportOptions()" class="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition">
+            <button onclick="openProfileWrapper('support')" class="bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full text-[11px] font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition">
                 <i class="fa-brands fa-whatsapp text-golist text-sm"></i> Support
             </button>
         </div>
@@ -65,50 +65,59 @@
             <span class="flex items-center gap-2 font-bold tracking-wide">
                 <i class="fa-solid fa-truck-fast text-white"></i> Delivery within 24 hours
             </span>
-            <span class="text-golist font-bold text-[9px] bg-white/90 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm">
+            <span onclick="window.location.href='master-catalog.html'" class="cursor-pointer text-golist font-bold text-[9px] bg-white/90 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-sm hover:bg-green-50 transition active:scale-95">
                 Local Fresh Stock <i class="fa-solid fa-chevron-right text-[8px]"></i>
             </span>
         </div>
     </header>
 
-    <div class="bg-white pb-1 pt-2 px-4 shadow-sm mb-2 rounded-b-3xl">
-        <div class="relative mb-2">
-            <input type="text" id="searchInput" onkeyup="filterProducts()" placeholder="E.g. 2 kg aloo, 1 shampoo..." class="w-full bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-xl py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-golist focus:border-transparent placeholder:text-slate-400 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]">
-            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-2.5 text-slate-400 text-lg"></i>
+
+    <div id="searchSection" class="bg-white pb-1 pt-2 px-4 shadow-sm mb-2 rounded-b-3xl sticky top-0 z-40 transition-all duration-300">
+        <div class="relative mb-2 transition-all duration-300" id="searchBoxWrapper">
+            <input type="text" id="searchInput" placeholder="E.g. 2 kg aloo, 1 shampoo..." class="w-full bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-xl py-2 pl-10 pr-10 focus:outline-none focus:ring-2 focus:ring-golist focus:border-transparent placeholder:text-slate-400 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] transition-all">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+            <button id="searchCloseBtn" onclick="disableSearchMode()" class="hidden absolute right-2 top-1.5 w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
         </div>
-        <div class="flex overflow-x-auto no-scrollbar gap-1 pb-1" id="categoryList">
-            <div class="flex flex-col items-center gap-1 min-w-[60px] opacity-50">
-                <div class="w-12 h-12 bg-slate-100 rounded-xl animate-pulse"></div>
+        
+        <div id="homeOptions" class="transition-all duration-300 overflow-hidden max-h-[200px] opacity-100">
+            <div class="flex overflow-x-auto no-scrollbar gap-1 pb-1" id="categoryList">
+                <div class="flex flex-col items-center gap-1 min-w-[60px] opacity-50">
+                    <div class="w-12 h-12 bg-slate-100 rounded-xl animate-pulse"></div>
+                </div>
             </div>
+            <button onclick="openAddModalWrapper()" class="w-full mt-1 mb-1 bg-golist hover:bg-golistDark text-white font-bold py-2.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition flex items-center justify-center gap-2 text-sm">
+                <i class="fa-solid fa-plus"></i> Add Custom Item
+            </button>
         </div>
-        <button onclick="openAddModal()" class="w-full mt-1 mb-1 bg-golist hover:bg-golistDark text-white font-bold py-2.5 rounded-xl shadow-lg shadow-green-200 active:scale-95 transition flex items-center justify-center gap-2 text-sm">
-            <i class="fa-solid fa-plus"></i> Add Custom Item
-        </button>
     </div>
 
-    <div id="liveOrderBanner" onclick="openTrackingModal()" class="hidden mx-4 mb-3 bg-white rounded-xl p-3 shadow-md border-l-4 border-blue-500 flex items-center justify-between animate-float cursor-pointer">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
-                <i class="fa-solid fa-motorcycle text-blue-600 animate-pulse"></i>
+    <div id="homeBanners" class="transition-all duration-300">
+        <div id="liveOrderBanner" onclick="openTrackingModal()" class="hidden mx-4 mb-3 bg-white rounded-xl p-3 shadow-md border-l-4 border-blue-500 flex items-center justify-between animate-float cursor-pointer">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center">
+                    <i class="fa-solid fa-motorcycle text-blue-600 animate-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase">Active Order</p>
+                    <h3 class="font-bold text-slate-800 text-sm" id="bannerStatus">Processing...</h3>
+                </div>
             </div>
-            <div>
-                <p class="text-[10px] text-slate-400 font-bold uppercase">Active Order</p>
-                <h3 class="font-bold text-slate-800 text-sm" id="bannerStatus">Processing...</h3>
-            </div>
+            <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
         </div>
-        <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+
+        <div id="recentSection" class="mb-2 px-4 py-1 hidden">
+            <div class="flex justify-between items-end mb-2">
+                <h2 class="text-sm font-bold text-slate-800">Recent Orders</h2>
+                <span class="text-[10px] text-slate-400 font-medium cursor-pointer" onclick="openHistoryWrapper()">View History <i class="fa-solid fa-chevron-right"></i></span>
+            </div>
+            <div class="flex overflow-x-auto no-scrollbar gap-2 pb-2" id="recentList"></div>
+        </div>
     </div>
 
-    <div id="recentSection" class="mb-2 px-4 py-1 hidden">
-        <div class="flex justify-between items-end mb-2">
-            <h2 class="text-sm font-bold text-slate-800">Recent Orders</h2>
-            <span class="text-[10px] text-slate-400 font-medium cursor-pointer" onclick="openHistory()">View History <i class="fa-solid fa-chevron-right"></i></span>
-        </div>
-        <div class="flex overflow-x-auto no-scrollbar gap-2 pb-2" id="recentList"></div>
-    </div>
-
-    <div class="bg-white rounded-t-3xl min-h-[60vh] px-4 pt-4 pb-24 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] relative">
-        <div class="flex justify-between items-center mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-50">
+    <div class="bg-white rounded-t-3xl min-h-[60vh] px-4 pt-4 pb-24 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] relative" id="mainProductContainer">
+        <div id="listHeader" class="flex justify-between items-center mb-3 sticky top-0 bg-white z-10 py-2 border-b border-slate-50 transition-all">
             <div>
                 <h2 class="text-base font-extrabold text-slate-800">Add to List</h2>
                 <p class="text-[10px] text-slate-400 font-medium" id="listSubHeader">Showing all items</p>
@@ -126,17 +135,20 @@
                 </button>
             </div>
         </div>
+        
         <div id="bulkDeleteAction" class="hidden mb-3 bg-red-50 p-3 rounded-xl flex justify-between items-center animate-float border border-red-100">
             <span class="text-xs font-bold text-red-600">Select items to remove</span>
             <button onclick="confirmBulkDelete()" class="bg-red-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-sm">DELETE</button>
         </div>
+
         <ul id="productList" class="space-y-2">
             <div class="text-center py-10 opacity-50">
                 <i class="fa-solid fa-spinner fa-spin text-2xl text-slate-300"></i>
                 <p class="text-xs mt-2 font-medium text-slate-400">Loading Products...</p>
             </div>
         </ul>
-        <div onclick="openAddModal()" class="mt-4 border-2 border-dashed border-slate-200 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-slate-50 transition">
+
+        <div id="bottomAddLink" onclick="openAddModalWrapper()" class="mt-4 border-2 border-dashed border-slate-200 rounded-xl py-3 flex items-center justify-center gap-2 text-slate-400 cursor-pointer hover:bg-slate-50 transition">
             <i class="fa-solid fa-plus text-sm"></i>
             <span class="font-bold text-xs">Add your own item...</span>
         </div>
@@ -441,9 +453,9 @@
         <span id="toastMsg">Updated</span>
     </div>
 
-    <script src="home-icons.js"></script>
-    <script src="home-core.js"></script>
-    <script src="home-features.js"></script>
-    <script src="profile-settings.js"></script>
+    <script src="core/firebase-config.js"></script>
+    <script src="modules/icons.js"></script>
+    <script src="core/app.js"></script>
+
 </body>
 </html>

@@ -23,22 +23,20 @@ window.onload = () => {
     // Initial Module Load (Feed/Home)
     loadModule('modules/feed.js', () => {
         console.log("📦 Feed Module Loaded");
-        // Feed module load hone ke baad agar koi specific function chalana ho to yahan likhenge
         if(window.initFeed) window.initFeed();
     });
 
     // Check Active Order (Global Check)
-    // Note: orders.js load hone par hi ye function milega, isliye hum check karte hain
     setTimeout(() => {
         if (!window.checkActiveOrderHome) {
             loadModule('modules/orders.js', () => {
                 if (typeof window.checkActiveOrderHome === 'function') window.checkActiveOrderHome();
             });
         }
-    }, 2000); // Thoda delay taaki main feed pehle load ho jaye
+    }, 2000);
 };
 
-// --- 2. DYNAMIC MODULE LOADER (Lazy Loading Logic) ---
+// --- 2. DYNAMIC MODULE LOADER ---
 window.loadedModules = new Set();
 
 window.loadModule = (path, callback) => {
@@ -74,7 +72,6 @@ window.setupHeader = () => {
         if(menuName) menuName.innerText = window.session.name || 'User';
         if(menuMobile) menuMobile.innerText = '+91 ' + window.session.mobile;
 
-        // Load Logo
         if(profileImg) {
             window.db.ref('users/' + window.targetMobile + '/logo').once('value', s => {
                 if(s.exists()) profileImg.src = s.val();
@@ -87,7 +84,6 @@ window.setupSideMenu = () => {
     const nav = document.getElementById('sidebarNav');
     if(!nav) return;
 
-    // Clean Menu Structure
     let html = `
         <button onclick="toggleMenu(); openAddModalWrapper()" class="w-full text-left px-4 py-3 rounded-xl hover:bg-green-50 text-slate-700 font-bold text-sm flex items-center gap-3 transition">
             <i class="fa-solid fa-plus text-golist w-5 text-lg"></i> Add Product
@@ -113,7 +109,6 @@ window.setupSideMenu = () => {
 };
 
 // --- 4. WRAPPERS FOR LAZY LOADING ---
-// Jab user button dabayega, tabhi relevant file load hogi
 
 window.openAddModalWrapper = () => {
     loadModule('modules/inventory.js', () => {
@@ -122,15 +117,16 @@ window.openAddModalWrapper = () => {
 };
 
 window.openHistoryWrapper = () => {
-    toggleMenu(); // Menu band karo
+    toggleMenu(); 
     loadModule('modules/orders.js', () => {
         if(window.openHistory) window.openHistory();
     });
 };
 
-window.openProfileWrapper = () => {
+// UPDATE: Added 'action' parameter to pass 'support' signal
+window.openProfileWrapper = (action = null) => {
     loadModule('modules/profile.js', () => {
-        if(window.openProfileSettings) window.openProfileSettings();
+        if(window.openProfileSettings) window.openProfileSettings(action);
     });
 };
 

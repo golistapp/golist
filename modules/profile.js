@@ -1,14 +1,13 @@
 // --- FILE: /modules/profile.js ---
-// Purpose: Profile Settings, Address Management, Security (PIN), and Support/Policies
+// Purpose: Profile Settings, Address, Security, Content, and Smart Highlighting
 
 (function() {
     console.log("👤 Profile Module Loaded");
 
     // --- 1. PROFILE SETTINGS UI ---
-    window.openProfileSettings = function() {
+    window.openProfileSettings = function(action = null) {
         let modal = document.getElementById('profileSettingsModal');
 
-        // Agar modal HTML mein nahi hai to error (home.html mein empty div hona chahiye)
         if (!modal) {
             console.error("Error: profileSettingsModal div missing in home.html");
             return;
@@ -109,7 +108,7 @@
                                 <i class="fa-solid fa-chevron-right text-slate-300 text-xs group-hover:text-slate-500 transition"></i>
                             </div>
 
-                             <div onclick="openSupportOptions()" class="flex items-center justify-between p-4 active:bg-slate-50 transition cursor-pointer group">
+                             <div id="btnContactSupport" onclick="openSupportOptions()" class="flex items-center justify-between p-4 active:bg-slate-50 transition cursor-pointer group border border-transparent rounded-xl duration-300">
                                 <div class="flex items-center gap-4">
                                     <div class="w-10 h-10 rounded-full bg-green-50 text-golist flex items-center justify-center text-lg group-hover:bg-green-100 transition">
                                         <i class="fa-brands fa-whatsapp"></i>
@@ -134,6 +133,25 @@
         `;
 
         modal.classList.remove('hidden');
+
+        // --- NEW: Highlight Logic if Action is 'support' ---
+        if (action === 'support') {
+            setTimeout(() => {
+                const btn = document.getElementById('btnContactSupport');
+                if (btn) {
+                    // 1. Scroll to view
+                    btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                    // 2. Add Highlight Styles (Blink Effect)
+                    btn.classList.add('bg-green-100', 'border-golist', 'ring-2', 'ring-golist', 'shadow-lg');
+
+                    // 3. Remove Styles after 2 seconds
+                    setTimeout(() => {
+                        btn.classList.remove('bg-green-100', 'border-golist', 'ring-2', 'ring-golist', 'shadow-lg');
+                    }, 2000);
+                }
+            }, 300); // Slight delay for modal animation
+        }
 
         // Load Profile Image
         window.db.ref('users/' + mobile + '/logo').once('value', s => {
