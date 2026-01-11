@@ -77,7 +77,7 @@ export default {
         // ============================================================
         container.innerHTML = `
             <div class="h-full flex flex-col bg-slate-50 relative fade-in">
-                
+
                 <div class="bg-white px-4 py-3 border-b border-slate-200 shadow-sm z-10 shrink-0 sticky top-0">
                     <div class="flex justify-between items-center mb-3">
                         <div>
@@ -90,7 +90,7 @@ export default {
                     </div>
                     <div class="relative">
                         <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                        <input type="text" id="search-bar" placeholder="Search products..." class="w-full bg-slate-100 border border-slate-200 text-slate-800 text-sm rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
+                        <input type="text" id="search-bar" placeholder="Search by name or tags..." class="w-full bg-slate-100 border border-slate-200 text-slate-800 text-sm rounded-lg pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 transition">
                     </div>
                 </div>
 
@@ -107,9 +107,10 @@ export default {
                     <i class="fa-solid fa-plus"></i>
                 </button>
 
+                <!-- MODAL START -->
                 <div id="prod-modal" class="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex flex-col justify-end sm:justify-center p-0 sm:p-6 animate-fade-in">
                     <div class="bg-white w-full sm:max-w-md mx-auto rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90%] sm:max-h-auto animate-slide-up">
-                        
+
                         <div class="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
                             <h3 class="font-bold text-slate-800 text-lg" id="modal-title">Add New Item</h3>
                             <button id="close-modal" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 flex items-center justify-center transition">
@@ -118,6 +119,7 @@ export default {
                         </div>
 
                         <div class="p-5 overflow-y-auto custom-scrollbar space-y-5">
+                            <!-- Image Upload -->
                             <div class="flex justify-center">
                                 <div class="relative w-32 h-32 bg-slate-50 rounded-xl border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition group" onclick="document.getElementById('modal-file').click()">
                                     <img id="modal-preview" class="w-full h-full object-cover rounded-xl hidden absolute inset-0">
@@ -127,9 +129,17 @@ export default {
                                 </div>
                             </div>
 
+                            <!-- Inputs -->
                             <div>
                                 <label class="text-xs font-bold text-slate-500 uppercase">Product Name</label>
                                 <input type="text" id="inp-name" placeholder="e.g. Fresh Tomato" class="w-full mt-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 text-sm focus:border-blue-500 outline-none">
+                            </div>
+
+                            <!-- New Tags Input -->
+                            <div>
+                                <label class="text-xs font-bold text-slate-500 uppercase">Search Tags (Keywords)</label>
+                                <input type="text" id="inp-tags" placeholder="e.g. fresh, desi, salad, red" class="w-full mt-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-slate-800 text-sm focus:border-blue-500 outline-none">
+                                <p class="text-[10px] text-slate-400 mt-1 ml-1">Comma separated (e.g. "desi, fresh")</p>
                             </div>
 
                             <div class="grid grid-cols-2 gap-4">
@@ -161,6 +171,17 @@ export default {
                                 </div>
                             </div>
 
+                            <!-- Visibility Toggle in Modal -->
+                            <div class="flex items-center justify-between bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                <label class="text-xs font-bold text-slate-600 uppercase flex items-center gap-2">
+                                    <i class="fa-solid fa-eye text-blue-500"></i> Show Product?
+                                </label>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="inp-status" class="sr-only peer" checked>
+                                    <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                                </label>
+                            </div>
+
                         </div>
 
                         <div class="p-4 border-t border-slate-100 bg-slate-50">
@@ -170,13 +191,14 @@ export default {
                         </div>
                     </div>
                 </div>
+                <!-- MODAL END -->
             </div>
         `;
 
         // ============================================================
         // 🧠 LOGIC
         // ============================================================
-        
+
         // Preview
         window.previewProdImage = (input) => {
             if (input.files && input.files[0]) {
@@ -194,26 +216,29 @@ export default {
         // Modal Functions
         const modal = document.getElementById('prod-modal');
         const modalTitle = document.getElementById('modal-title');
-        
+
         const openModal = (isEdit = false, key = null) => {
             modal.classList.remove('hidden');
             this.populateDropdowns();
-            
+
             if (isEdit && key && cachedProducts[key]) {
                 // EDIT MODE
                 const data = cachedProducts[key];
                 currentEditKey = key;
                 currentEditImg = data.image || "";
-                
+
                 modalTitle.innerText = "Edit Item";
                 document.getElementById('inp-name').value = data.name || "";
+                document.getElementById('inp-tags').value = data.tags || ""; // LOAD TAGS
                 document.getElementById('inp-price').value = data.price || "";
                 document.getElementById('inp-cat').value = data.category || "";
-                
-                // Qty & Unit Load
                 document.getElementById('inp-qty').value = data.qty || ""; 
                 document.getElementById('inp-unit').value = data.unit || "";
-                
+
+                // Status Checkbox
+                const isActive = data.isActive !== false; 
+                document.getElementById('inp-status').checked = isActive;
+
                 if (data.image) {
                     document.getElementById('modal-preview').src = data.image;
                     document.getElementById('modal-preview').classList.remove('hidden');
@@ -233,10 +258,12 @@ export default {
 
         const resetForm = () => {
             document.getElementById('inp-name').value = '';
+            document.getElementById('inp-tags').value = ''; // RESET TAGS
             document.getElementById('inp-price').value = '';
             document.getElementById('inp-cat').value = '';
             document.getElementById('inp-qty').value = '';
             document.getElementById('inp-unit').value = '';
+            document.getElementById('inp-status').checked = true; 
             document.getElementById('modal-file').value = '';
             resetImageUI();
         };
@@ -260,10 +287,12 @@ export default {
         const btnSave = document.getElementById('btn-save');
         btnSave.onclick = async () => {
             const name = document.getElementById('inp-name').value.trim();
+            const tags = document.getElementById('inp-tags').value.trim(); // GET TAGS
             const price = document.getElementById('inp-price').value;
             const cat = document.getElementById('inp-cat').value;
             const qty = document.getElementById('inp-qty').value;
             const unit = document.getElementById('inp-unit').value;
+            const status = document.getElementById('inp-status').checked;
             const file = document.getElementById('modal-file').files[0];
 
             if(!name || !price || !cat || !unit || !qty) return alert("Fill all details");
@@ -272,18 +301,20 @@ export default {
             btnSave.disabled = true;
 
             try {
-                let imgUrl = currentEditImg; // Default to old image
+                let imgUrl = currentEditImg; 
                 if(file) {
-                    imgUrl = await this.uploadImage(file); // Upload new if selected
+                    imgUrl = await this.uploadImage(file); 
                 }
 
                 const payload = {
-                    name, 
+                    name,
+                    tags, // SAVE TAGS
                     price, 
                     category: cat, 
-                    qty: qty, // New Field
+                    qty: qty,
                     unit: unit,
                     image: imgUrl,
+                    isActive: status, 
                     updatedAt: firebase.database.ServerValue.TIMESTAMP
                 };
 
@@ -309,8 +340,7 @@ export default {
         this.populateDropdowns = () => {
             const catSel = document.getElementById('inp-cat');
             const unitSel = document.getElementById('inp-unit');
-            
-            // Keep selected value if exists
+
             const currentCat = catSel.value;
             const currentUnit = unitSel.value;
 
@@ -368,7 +398,7 @@ export default {
             if(snap.exists()) {
                 const data = snap.val();
                 cachedProducts = data; 
-                
+
                 const entries = Object.entries(data).reverse();
                 countLabel.innerText = entries.length + " Items Found";
 
@@ -376,11 +406,19 @@ export default {
                     const catName = (cachedCats[item.category]) ? cachedCats[item.category].name : 'Unknown';
                     const unitName = (cachedUnits[item.unit]) ? cachedUnits[item.unit].name : (item.unit || 'Unit');
                     const displayPrice = item.price || '--';
-                    const displayQty = item.qty || '1'; // Default to 1 if missing
+                    const displayQty = item.qty || '1'; 
+
+                    const isActive = item.isActive !== false; 
+                    const opacityClass = isActive ? 'opacity-100' : 'opacity-60 grayscale';
+                    const toggleIcon = isActive ? 'fa-toggle-on text-green-500' : 'fa-toggle-off text-slate-400';
+                    const toggleTitle = isActive ? 'Disable' : 'Enable';
 
                     const card = document.createElement('div');
-                    card.className = "bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition relative group prod-card";
-                    card.dataset.name = (item.name || "").toLowerCase();
+                    card.className = `bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition relative group prod-card ${opacityClass}`;
+
+                    // SEARCH INDEX: Name + Tags
+                    const searchString = (item.name + " " + (item.tags || "")).toLowerCase();
+                    card.dataset.search = searchString;
 
                     const imgHtml = item.image 
                         ? `<img src="${item.image}" class="w-full h-32 object-cover bg-slate-50">`
@@ -391,6 +429,7 @@ export default {
                         <div class="p-3">
                             <div class="flex justify-between items-start mb-1">
                                 <span class="text-[10px] font-bold text-blue-500 bg-blue-50 px-1.5 py-0.5 rounded uppercase tracking-wide truncate max-w-[70%]">${catName}</span>
+                                ${!isActive ? '<span class="text-[9px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">HIDDEN</span>' : ''}
                             </div>
                             <h3 class="font-bold text-slate-800 text-sm truncate mb-1" title="${item.name}">${item.name}</h3>
                             <div class="flex items-center justify-between mt-2">
@@ -398,12 +437,16 @@ export default {
                                 <span class="text-[11px] text-slate-500 font-medium bg-slate-100 px-2 py-0.5 rounded">${displayQty} ${unitName}</span>
                             </div>
                         </div>
-                        
-                        <div class="absolute top-2 right-2 flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition">
-                            <button class="w-7 h-7 bg-white/90 backdrop-blur text-blue-600 rounded-full shadow-sm flex items-center justify-center border border-blue-100 hover:bg-blue-50 edit-btn" data-key="${key}">
+
+                        <!-- Action Buttons -->
+                        <div class="absolute top-2 right-2 flex gap-2 opacity-100 sm:opacity-0 group-hover:opacity-100 transition z-10">
+                             <button class="w-7 h-7 bg-white/95 backdrop-blur rounded-full shadow-sm flex items-center justify-center border border-slate-100 hover:bg-slate-50 toggle-btn" data-key="${key}" data-status="${isActive}" title="${toggleTitle}">
+                                <i class="fa-solid ${toggleIcon} text-lg"></i>
+                            </button>
+                            <button class="w-7 h-7 bg-white/95 backdrop-blur text-blue-600 rounded-full shadow-sm flex items-center justify-center border border-blue-100 hover:bg-blue-50 edit-btn" data-key="${key}">
                                 <i class="fa-solid fa-pen text-xs"></i>
                             </button>
-                            <button class="w-7 h-7 bg-white/90 backdrop-blur text-red-500 rounded-full shadow-sm flex items-center justify-center border border-red-100 hover:bg-red-50 delete-btn" data-key="${key}">
+                            <button class="w-7 h-7 bg-white/95 backdrop-blur text-red-500 rounded-full shadow-sm flex items-center justify-center border border-red-100 hover:bg-red-50 delete-btn" data-key="${key}">
                                 <i class="fa-solid fa-trash text-xs"></i>
                             </button>
                         </div>
@@ -421,25 +464,38 @@ export default {
         grid.addEventListener('click', (e) => {
             const editBtn = e.target.closest('.edit-btn');
             const deleteBtn = e.target.closest('.delete-btn');
+            const toggleBtn = e.target.closest('.toggle-btn');
+
+            if (toggleBtn) {
+                const key = toggleBtn.dataset.key;
+                const currentStatus = toggleBtn.dataset.status === 'true'; 
+                const newStatus = !currentStatus; 
+
+                db.ref('masterProducts/' + key).update({ isActive: newStatus });
+            }
 
             if (editBtn) {
                 const key = editBtn.dataset.key;
                 this.populateDropdowns(); 
                 document.getElementById('fab-add').click(); // Trigger Open
-                
+
                 // Override with Edit Data
                 const data = cachedProducts[key];
                 if(data) {
                     currentEditKey = key;
                     currentEditImg = data.image || "";
                     document.getElementById('modal-title').innerText = "Edit Item";
-                    
+
                     document.getElementById('inp-name').value = data.name || "";
+                    document.getElementById('inp-tags').value = data.tags || ""; // SET TAGS
                     document.getElementById('inp-price').value = data.price || "";
                     document.getElementById('inp-cat').value = data.category || "";
                     document.getElementById('inp-qty').value = data.qty || "";
                     document.getElementById('inp-unit').value = data.unit || "";
-                    
+
+                    const isActive = data.isActive !== false;
+                    document.getElementById('inp-status').checked = isActive;
+
                     if(data.image) {
                         document.getElementById('modal-preview').src = data.image;
                         document.getElementById('modal-preview').classList.remove('hidden');
@@ -457,11 +513,12 @@ export default {
             }
         });
 
-        // Search Filter
+        // Search Filter (Updated for Tags)
         document.getElementById('search-bar').addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             document.querySelectorAll('.prod-card').forEach(card => {
-                if(card.dataset.name.includes(term)) card.classList.remove('hidden');
+                // Check against Name + Tags
+                if(card.dataset.search.includes(term)) card.classList.remove('hidden');
                 else card.classList.add('hidden');
             });
         });

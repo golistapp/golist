@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="icon" type="image/png" href="https://ik.imagekit.io/kdtvm0r78/1000125748_Qc0zZNIFs.png">
+
+    <meta property="og:title" content="GoList - Your Local Inventory Store">
+    <meta property="og:description" content="Add products online and manage delivery.">
+    <meta property="og:image" content="https://ik.imagekit.io/kdtvm0r78/1000125748_Qc0zZNIFs.png">
+    <meta property="og:type" content="website">
+
+    <title>GoList - Start Your Journey</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golist: '#369152',
+                        golistDark: '#2d7a44',
+                        golistLight: '#e6f4ea'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        .input-group:focus-within { transform: translateY(-2px); transition: all 0.3s; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #369152; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: none; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modern Card Hover */
+        .option-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); border: 2px solid transparent; }
+        .option-card:active { transform: scale(0.95); }
+
+        /* Animation */
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .hidden-section { display: none; }
+
+        /* Modal Overlay */
+        .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(2px); }
+    </style>
+</head>
+<body class="text-slate-800 antialiased flex flex-col min-h-screen bg-slate-50">
+
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-[100] transition-all duration-300 opacity-0 pointer-events-none text-xs font-semibold flex items-center gap-2">
+        <i class="fa-solid fa-circle-info text-yellow-400"></i><span id="toastMsg">Notification</span>
+    </div>
+
+    <div class="flex-grow flex flex-col justify-center items-center p-6 w-full max-w-md mx-auto">
+
+        <div id="landingSection" class="w-full space-y-6 fade-in">
+            <div class="text-center mb-10">
+                <img src="https://ik.imagekit.io/kdtvm0r78/1000125748_Qc0zZNIFs.png" alt="GoList Logo" class="h-12 mx-auto drop-shadow-sm">
+                <p class="text-slate-400 text-xs mt-3 font-bold uppercase tracking-wider">Select Role to Continue</p>
+            </div>
+
+           <div onclick="showShopLogin()" class="option-card bg-white p-6 rounded-2xl shadow-lg border border-slate-100 cursor-pointer flex items-center gap-5 hover:border-green-200 hover:shadow-xl group">
+    <div class="w-14 h-14 rounded-full bg-golistLight flex items-center justify-center shadow-sm shrink-0 group-hover:bg-golist transition">
+        <img src="https://ik.imagekit.io/kdtvm0r78/1000125737_X6opgWvzIj.png" alt="List Icon" class="w-14 h-14 object-contain">
+    </div>
+
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg group-hover:text-golist transition">Create My List</h3>
+                    <p class="text-xs text-slate-500 mt-1">Add products & manage inventory.</p>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 ml-auto group-hover:text-golist"></i>
+            </div>
+
+            <div onclick="window.location.href='../Delivery/delivery-login.html'" class="option-card bg-white p-6 rounded-2xl shadow-lg border border-slate-100 cursor-pointer flex items-center gap-5 hover:border-orange-200 hover:shadow-xl group">
+                <div class="w-14 h-14 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 shadow-sm shrink-0 group-hover:bg-orange-500 group-hover:text-white transition">
+                    <i class="fa-solid fa-motorcycle text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-lg group-hover:text-orange-600 transition">Delivery Partner</h3>
+                    <p class="text-xs text-slate-500 mt-1">Join fleet & earn money.</p>
+                </div>
+                <i class="fa-solid fa-chevron-right text-slate-300 ml-auto group-hover:text-orange-500"></i>
+            </div>
+
+            <div class="text-center mt-16 opacity-50">
+                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Powered by Ramazone</p>
+            </div>
+        </div>
+
+        <div id="shopLoginSection" class="w-full hidden-section">
+
+            <button onclick="showLanding()" class="mb-6 flex items-center gap-2 text-slate-500 hover:text-golist font-bold text-xs transition">
+                <div class="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </div>
+                <span>Back</span>
+            </button>
+
+            <div class="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 relative overflow-hidden fade-in">
+                <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-golist to-green-400"></div>
+
+                <div class="text-center mb-8">
+                    <div class="w-16 h-16 bg-golistLight rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-sm border border-green-100">
+                        <img src="https://ik.imagekit.io/kdtvm0r78/1000123830_7NnxUWaXG.png" class="w-9 h-9 object-contain">
+                    </div>
+                    <h1 class="text-2xl font-extrabold text-slate-800 tracking-tight">My List Login</h1>
+                    <p class="text-slate-400 text-xs font-bold uppercase tracking-wide mt-1">Secure Access</p>
+                </div>
+
+                <form id="authForm" class="space-y-4">
+                    <div class="input-group">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Mobile Number</label>
+                        <div class="relative">
+                            <span class="absolute left-4 top-3.5 text-slate-400 font-bold text-sm">+91</span>
+                            <input type="tel" id="mobile" required pattern="[0-9]{10}" maxlength="10" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-golist focus:bg-white font-bold text-slate-800 tracking-widest transition" placeholder="XXXXXXXXXX" oninput="checkUserExists()">
+                        </div>
+                    </div>
+
+                    <div id="newUserDataFields" class="hidden space-y-4 animate-[fadeIn_0.3s_ease-out]">
+                        <div class="input-group">
+                            <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Owner Name</label>
+                            <input type="text" id="ownerName" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-golist focus:bg-white font-semibold" placeholder="Ex: Rahul Sharma">
+                        </div>
+
+                        <div class="p-3 bg-green-50 rounded-xl border border-green-100">
+                            <h4 class="text-xs font-bold text-golistDark mb-2 flex items-center gap-1"><i class="fa-solid fa-shield-cat"></i> Security Setup</h4>
+                            <div class="space-y-2">
+                                <select id="regSecQ" class="w-full bg-white border border-green-200 rounded-lg px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-golist">
+                                    <option value="" disabled selected>Select Secret Question</option>
+                                    <option value="school">What was your first school name?</option>
+                                    <option value="pet">What is your pet's name?</option>
+                                    <option value="mother">What is your mother's name?</option>
+                                    <option value="city">In which city were you born?</option>
+                                    <option value="bike">What is your dream bike?</option>
+                                </select>
+                                <input type="text" id="regSecA" class="w-full bg-white border border-green-200 rounded-lg px-3 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-golist" placeholder="Your Answer (Gupt Jawab)">
+                            </div>
+                            <p class="text-[9px] text-green-600 mt-1 opacity-70">*Used to recover password.</p>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase ml-1">Store PIN</label>
+                        <input type="password" id="pin" required maxlength="4" pattern="[0-9]*" inputmode="numeric" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus:outline-none focus:ring-2 focus:ring-golist focus:bg-white font-bold text-slate-800 tracking-[0.5em] text-center text-lg" placeholder="••••">
+                    </div>
+
+                    <button type="submit" id="submitBtn" class="w-full bg-golist hover:bg-golistDark text-white font-bold py-4 rounded-xl shadow-lg shadow-green-200 mt-4 flex items-center justify-center gap-2 transition active:scale-95">
+                        <span id="btnText">START MY LIST</span>
+                        <div class="loader border-t-white" id="btnLoader"></div>
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center border-t border-slate-100 pt-4">
+                    <button onclick="openForgotPinModal()" class="text-xs font-bold text-slate-400 hover:text-golist transition px-4 py-2">
+                        <i class="fa-solid fa-key mr-1"></i> Forgot PIN?
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="forgotPinModal" class="fixed inset-0 z-50 hidden flex items-center justify-center modal-overlay p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden animate-[fadeIn_0.3s_ease-out]">
+            <div class="bg-slate-900 p-4 flex justify-between items-center">
+                <h3 class="text-white font-bold text-lg flex items-center gap-2"><i class="fa-solid fa-user-lock text-golist"></i> Recover PIN</h3>
+                <button onclick="closeForgotPinModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+
+            <div class="p-6">
+                <div id="stepCheckMobile" class="space-y-4">
+                    <p class="text-xs text-slate-500 font-medium">Enter your registered mobile number.</p>
+                    <div class="relative">
+                        <span class="absolute left-4 top-3.5 text-slate-400 font-bold text-sm">+91</span>
+                        <input type="tel" id="recMobile" class="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-3 font-bold text-slate-800 tracking-widest focus:ring-2 focus:ring-golist focus:outline-none" placeholder="9876543210" maxlength="10">
+                    </div>
+                    <button onclick="checkUserForRecovery()" id="btnCheckRec" class="w-full bg-golist hover:bg-golistDark text-white font-bold py-3 rounded-xl shadow-lg transition">
+                        Proceed
+                    </button>
+                </div>
+
+                <div id="stepSecQuestion" class="hidden space-y-4">
+                    <div class="bg-green-50 p-3 rounded-xl border border-green-100 text-center">
+                        <p class="text-[10px] font-bold text-green-600 uppercase">Security Question</p>
+                        <p class="text-sm font-bold text-slate-800 mt-1" id="dispSecQ">Loading...</p>
+                    </div>
+                    <div>
+                        <input type="text" id="recAnswer" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-bold text-slate-800 text-center focus:ring-2 focus:ring-golist focus:outline-none" placeholder="Enter Answer">
+                    </div>
+                    <button onclick="verifySecurityAnswer()" class="w-full bg-golist hover:bg-golistDark text-white font-bold py-3 rounded-xl shadow-lg transition">
+                        Verify & Show PIN
+                    </button>
+
+                    <div id="wrongAnsFallback" class="hidden pt-2 border-t border-slate-100 animate-[fadeIn_0.3s_ease-out]">
+                        <p class="text-[10px] text-red-500 font-bold text-center mb-2">Incorrect Answer.</p>
+                        <button onclick="contactAdminRecovery()" class="w-full bg-slate-100 text-slate-600 font-bold py-3 rounded-xl flex items-center justify-center gap-2 text-xs hover:bg-slate-200 transition">
+                            <i class="fa-brands fa-whatsapp text-lg text-golist"></i> Ask Admin
+                        </button>
+                    </div>
+                </div>
+
+                <div id="stepManualRec" class="hidden text-center space-y-4">
+                    <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto text-amber-600 text-2xl mb-2">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-800">No Security Question Set</h4>
+                    <button onclick="contactAdminRecovery()" class="w-full bg-golist text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-lg"></i> Contact Admin
+                    </button>
+                </div>
+
+                <div id="stepShowPin" class="hidden text-center space-y-4 py-4">
+                    <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-golist text-2xl mb-2">
+                        <i class="fa-solid fa-unlock-keyhole"></i>
+                    </div>
+                    <h4 class="text-lg font-bold text-slate-800">Identity Verified!</h4>
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                        <p class="text-xs text-slate-500 uppercase font-bold mb-1">Your Current PIN</p>
+                        <p class="text-3xl font-mono font-extrabold text-slate-900 tracking-widest" id="recoveredPin">----</p>
+                    </div>
+                    <button onclick="closeForgotPinModal()" class="w-full bg-slate-900 text-white font-bold py-3 rounded-xl mt-2">Login Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCmgMr4cj7ec1B09eu3xpRhCwsVCeQR9v0",
+            authDomain: "tipsplit-e3wes.firebaseapp.com",
+            databaseURL: "https://tipsplit-e3wes-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "tipsplit-e3wes",
+            storageBucket: "tipsplit-e3wes.firebasestorage.app",
+            messagingSenderId: "984733883633",
+            appId: "1:984733883633:web:adc1e1d22b629a6b631d50"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // --- AUTH CHECK ---
+        const existingUser = localStorage.getItem('rmz_user');
+        if (existingUser) {
+            window.location.href = 'home.html';
+        }
+
+        // --- NAVIGATION FUNCTIONS ---
+        function showShopLogin() {
+            document.getElementById('landingSection').classList.add('hidden-section');
+            document.getElementById('shopLoginSection').classList.remove('hidden-section');
+        }
+
+        function showLanding() {
+            document.getElementById('shopLoginSection').classList.add('hidden-section');
+            document.getElementById('landingSection').classList.remove('hidden-section');
+        }
+
+        // --- LOGIN LOGIC ---
+        const form = document.getElementById('authForm');
+        const mobileInput = document.getElementById('mobile');
+        const newUserFields = document.getElementById('newUserDataFields');
+        const ownerNameInput = document.getElementById('ownerName');
+        const btnText = document.getElementById('btnText');
+        const btnLoader = document.getElementById('btnLoader');
+        let typingTimer;
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            document.getElementById('toastMsg').innerText = msg;
+            t.classList.remove('opacity-0', 'pointer-events-none');
+            setTimeout(() => t.classList.add('opacity-0', 'pointer-events-none'), 3000);
+        }
+
+        function checkUserExists() {
+            clearTimeout(typingTimer);
+            const mobile = mobileInput.value;
+            if (mobile.length === 10) {
+                typingTimer = setTimeout(() => {
+                    db.ref('users/' + mobile).once('value').then((snapshot) => {
+                        if (snapshot.exists()) {
+                            // User exists - Hide extra fields
+                            newUserFields.classList.add('hidden');
+                            ownerNameInput.required = false;
+                            document.getElementById('regSecQ').required = false;
+                            document.getElementById('regSecA').required = false;
+                            btnText.innerText = "OPEN WORKSHOP";
+                        } else {
+                            // New User - Show Name & Security fields
+                            newUserFields.classList.remove('hidden');
+                            ownerNameInput.required = true;
+                            document.getElementById('regSecQ').required = true;
+                            document.getElementById('regSecA').required = true;
+                            btnText.innerText = "CREATE WORKSHOP";
+                        }
+                    });
+                }, 500);
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const mobile = mobileInput.value;
+            const pin = document.getElementById('pin').value;
+
+            if(mobile.length !== 10) return showToast("Invalid Mobile");
+            if(pin.length !== 4) return showToast("PIN must be 4 digits");
+
+            btnLoader.style.display = 'block';
+            btnText.style.display = 'none';
+
+            try {
+                const userRef = db.ref('users/' + mobile);
+                const snapshot = await userRef.once('value');
+
+                if (snapshot.exists()) {
+                    // LOGIN MODE
+                    const userData = snapshot.val();
+                    if (userData.pin === pin) {
+                        saveAndRedirect(userData, mobile);
+                    } else {
+                        showToast("Wrong PIN");
+                        resetBtn();
+                    }
+                } else {
+                    // REGISTER MODE
+                    const name = ownerNameInput.value.trim();
+                    const secQ = document.getElementById('regSecQ').value;
+                    const secA = document.getElementById('regSecA').value.trim().toLowerCase();
+
+                    if (!name) { showToast("Name Required"); resetBtn(); return; }
+                    if (!secQ || !secA) { showToast("Set Security Question!"); resetBtn(); return; }
+
+                    const newUser = { 
+                        name: name, 
+                        pin: pin, 
+                        mobile: mobile, 
+                        securityQ: secQ,
+                        securityA: secA,
+                        joinedAt: new Date().toISOString() 
+                    };
+
+                    await userRef.set(newUser);
+                    saveAndRedirect(newUser, mobile);
+                }
+            } catch (error) {
+                showToast("Error: " + error.message);
+                resetBtn();
+            }
+        });
+
+        function saveAndRedirect(user, mobile) {
+            const sessionData = { mobile: mobile, name: user.name, isLoggedIn: true };
+            localStorage.setItem('rmz_user', JSON.stringify(sessionData));
+            showToast("Success! Opening...");
+            setTimeout(() => window.location.href = 'home.html', 500);
+        }
+
+        function resetBtn() {
+            btnLoader.style.display = 'none';
+            btnText.style.display = 'block';
+        }
+
+        // --- SECURE RECOVERY SYSTEM ---
+        let recoveredUserData = null;
+        let recoveryMobile = '';
+
+        function openForgotPinModal() {
+            document.getElementById('forgotPinModal').classList.remove('hidden');
+            if(mobileInput.value.length === 10) {
+                document.getElementById('recMobile').value = mobileInput.value;
+            }
+        }
+
+        function closeForgotPinModal() {
+            document.getElementById('forgotPinModal').classList.add('hidden');
+            // Reset Views
+            document.getElementById('stepCheckMobile').classList.remove('hidden');
+            document.getElementById('stepSecQuestion').classList.add('hidden');
+            document.getElementById('stepManualRec').classList.add('hidden');
+            document.getElementById('stepShowPin').classList.add('hidden');
+            document.getElementById('wrongAnsFallback').classList.add('hidden'); // Hide fallback
+            document.getElementById('recAnswer').value = '';
+        }
+
+        function checkUserForRecovery() {
+            recoveryMobile = document.getElementById('recMobile').value;
+            if(recoveryMobile.length !== 10) return showToast("Enter Valid Mobile");
+
+            const btn = document.getElementById('btnCheckRec');
+            btn.innerHTML = 'Checking...';
+            btn.disabled = true;
+
+            db.ref('users/' + recoveryMobile).once('value').then(snap => {
+                btn.innerHTML = 'Proceed';
+                btn.disabled = false;
+
+                if(snap.exists()) {
+                    recoveredUserData = snap.val();
+
+                    // Check if security question is set
+                    if(recoveredUserData.securityQ && recoveredUserData.securityA) {
+                        // Plan B: Automated Secure Recovery
+                        document.getElementById('stepCheckMobile').classList.add('hidden');
+                        document.getElementById('stepSecQuestion').classList.remove('hidden');
+                        // Hide fallback initially
+                        document.getElementById('wrongAnsFallback').classList.add('hidden');
+
+                        // Map Question Codes to Text
+                        const qMap = {
+                            'school': 'What was your first school name?',
+                            'pet': 'What is your pet\'s name?',
+                            'mother': 'What is your mother\'s name?',
+                            'city': 'In which city were you born?',
+                            'bike': 'What is your dream bike?'
+                        };
+                        document.getElementById('dispSecQ').innerText = qMap[recoveredUserData.securityQ] || "Secret Question";
+                    } else {
+                        // Plan C: Manual Fallback
+                        document.getElementById('stepCheckMobile').classList.add('hidden');
+                        document.getElementById('stepManualRec').classList.remove('hidden');
+                    }
+                } else {
+                    showToast("User not found!");
+                }
+            });
+        }
+
+        function verifySecurityAnswer() {
+            const inputAns = document.getElementById('recAnswer').value.trim().toLowerCase();
+            if(!inputAns) return showToast("Enter Answer");
+
+            // Check Answer (Case Insensitive)
+            if(inputAns === recoveredUserData.securityA) {
+                document.getElementById('stepSecQuestion').classList.add('hidden');
+                document.getElementById('stepShowPin').classList.remove('hidden');
+                document.getElementById('recoveredPin').innerText = recoveredUserData.pin;
+            } else {
+                // Incorrect Answer -> Show Fallback Button
+                showToast("Incorrect Answer!");
+                document.getElementById('wrongAnsFallback').classList.remove('hidden');
+            }
+        }
+
+        function contactAdminRecovery() {
+            const m = recoveryMobile;
+            const text = `Hi Admin, I forgot my PIN for Mobile: ${m}. My security answer is incorrect or forgotten. Please verify me manually.`;
+            window.open(`https://wa.me/917903698180?text=${encodeURIComponent(text)}`, '_blank');
+        }
+
+    </script>
+</body>
+</html>
