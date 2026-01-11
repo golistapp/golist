@@ -1,5 +1,5 @@
 // --- FILE: /core/app.js ---
-// Purpose: Main Application Controller (Session, Navigation, Module Loader)
+// Purpose: Main Application Controller (Session, Navigation, Module Loader, PWA)
 
 // Global State
 window.session = JSON.parse(localStorage.getItem('rmz_user'));
@@ -34,6 +34,13 @@ window.onload = () => {
             });
         }
     }, 2000);
+
+    // Register Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('✅ SW Registered', reg))
+            .catch(err => console.log('❌ SW Failed', err));
+    }
 };
 
 // --- 2. DYNAMIC MODULE LOADER ---
@@ -134,3 +141,43 @@ window.logout = () => {
     localStorage.removeItem('rmz_user');
     window.location.href = 'index.html';
 };
+
+
+// --- 5. PWA INSTALLATION LOGIC (NEW) ---
+let deferredPrompt;
+
+// Browser event: Jab site install ho sakti hai
+window.addEventListener('beforeinstallprompt', (e) => {
+    // 1. Default prompt ko roko (humein apna button dikhana hai)
+    e.preventDefault();
+    // 2. Event ko save kar lo baad ke liye
+    deferredPrompt = e;
+    // 3. Apna button dikhao
+    const installBtn = document.getElementById('installAppBtn');
+    if(installBtn) installBtn.classList.remove('hidden');
+    console.log("📲 App is installable, button shown.");
+});
+
+// Button click function
+window.installPWA = async () => {
+    if (!deferredPrompt) return;
+
+    // Native prompt dikhao
+    deferredPrompt.prompt();
+
+    // User ka decision wait karo
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response: ${outcome}`);
+
+    // Button wapas chupao ya event clear karo
+    deferredPrompt = null;
+    const installBtn = document.getElementById('installAppBtn');
+    if(installBtn) installBtn.classList.add('hidden');
+};
+
+// Agar app already installed hai, to check
+window.addEventListener('appinstalled', () => {
+    console.log('✅ App installed successfully');
+    const installBtn = document.getElementById('installAppBtn');
+    if(installBtn) installBtn.classList.add('hidden');
+});
