@@ -1,0 +1,156 @@
+/* =========================================
+   1. GLOBAL DEFAULTS & FONTS
+   ========================================= */
+body { 
+    font-family: 'Inter', sans-serif; 
+    -webkit-tap-highlight-color: transparent; 
+}
+
+/* Hide Scrollbar but keep functionality */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Modal Overlay Background */
+.modal-overlay { 
+    background: rgba(0,0,0,0.6); 
+    backdrop-filter: blur(2px); 
+}
+
+/* =========================================
+   2. LOGIN PAGE STYLES
+   ========================================= */
+.input-group:focus-within { 
+    transform: translateY(-2px); 
+    transition: all 0.3s; 
+}
+
+/* Vehicle Selection Buttons */
+.vehicle-option { 
+    border: 1px solid #e2e8f0; 
+    background: #f8fafc; 
+    color: #64748b; 
+    transition: all 0.2s; 
+}
+.vehicle-option.selected { 
+    background: #369152; 
+    color: white; 
+    border-color: #369152; 
+    box-shadow: 0 4px 6px -1px rgba(54, 145, 82, 0.3);
+}
+
+/* =========================================
+   3. HOME PAGE UI ELEMENTS
+   ========================================= */
+
+/* Toggle Switch (Duty ON/OFF) */
+.toggle-checkbox:checked { right: 0; border-color: #22c55e; }
+.toggle-checkbox:checked + .toggle-label { background-color: #22c55e; }
+
+/* Sidebar & Menu Overlay */
+.sidebar { transform: translateX(-100%); transition: transform 0.3s ease-in-out; }
+.sidebar.open { transform: translateX(0); }
+
+.overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.overlay.open { opacity: 1; pointer-events: auto; }
+
+/* Modern Cards */
+.glass-card { 
+    background: #ffffff; 
+    border: 1px solid #e5e7eb; 
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); 
+}
+
+/* Range Slider Styling */
+input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
+input[type=range]::-webkit-slider-thumb { 
+    -webkit-appearance: none; 
+    height: 20px; width: 20px; 
+    border-radius: 50%; 
+    background: #f59e0b; 
+    cursor: pointer; 
+    margin-top: -8px; 
+    box-shadow: 0 2px 6px rgba(245,158,11,0.4); 
+    border: 2px solid white; 
+}
+input[type=range]::-webkit-slider-runnable-track { 
+    width: 100%; 
+    height: 6px; 
+    cursor: pointer; 
+    background: #e5e7eb; 
+    border-radius: 4px; 
+}
+
+/* Text Stroke Utility (for Celebration Overlay) */
+.text-stroke-black {
+    -webkit-text-stroke: 1px black;
+}
+
+/* =========================================
+   4. MAP STYLES (Leaflet)
+   ========================================= */
+#deliveryMap { 
+    height: 100%; 
+    width: 100%; 
+    z-index: 1; 
+    border-radius: 12px; 
+}
+.map-container { 
+    height: 320px; 
+    width: 100%; 
+    position: relative; 
+    overflow: hidden; 
+    border-radius: 16px; 
+    border: 1px solid #e5e7eb; 
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
+}
+
+/* Custom Marker Icons */
+.custom-div-icon { 
+    background: transparent; 
+    border: none; 
+}
+
+/* Hide Default Routing Text Instructions (Clean Map) */
+.leaflet-routing-container { display: none !important; }
+
+/* =========================================
+   5. ANIMATIONS
+   ========================================= */
+
+/* Shake Animation (Error) */
+.shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+@keyframes shake { 
+    10%, 90% { transform: translate3d(-1px, 0, 0); } 
+    20%, 80% { transform: translate3d(2px, 0, 0); } 
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 
+    40%, 60% { transform: translate3d(4px, 0, 0); } 
+}
+
+/* Fade In */
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { 
+    from { opacity: 0; transform: translateY(10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+/* Slide Up (Modals) */
+.modal-animate { animation: slideUp 0.3s ease-out forwards; }
+@keyframes slideUp { 
+    from { transform: translateY(100%); opacity: 0; } 
+    to { transform: translateY(0); opacity: 1; } 
+}
+
+/* Pulse Border (Active Status) */
+.pulse-border { animation: pulse-orange 2s infinite; }
+@keyframes pulse-orange { 
+    0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 
+    70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); } 
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } 
+}
+
+/* Pop In (Celebration) */
+@keyframes popIn {
+    0% { transform: scale(0.5); opacity: 0; }
+    80% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); }
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Delivery Partner - GoList</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        golist: '#369152',
+                        golistDark: '#2d7a44',
+                        golistLight: '#e6f4ea'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="text-slate-800 antialiased bg-slate-50 min-h-screen">
+
+    <div id="app" class="w-full h-full"></div>
+
+    <div id="toast" class="fixed top-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl z-[200] opacity-0 pointer-events-none transition-all duration-300 text-xs font-bold flex gap-2 items-center">
+        <i class="fa-solid fa-circle-info text-yellow-400"></i><span id="toastMsg">Alert</span>
+    </div>
+
+    <div id="celebrationOverlay" class="fixed inset-0 z-[200] pointer-events-none flex items-center justify-center hidden">
+        <div class="text-center animate-[popIn_0.5s_ease-out]">
+            <div class="text-6xl mb-2">🎉</div>
+            <h2 class="text-3xl font-extrabold text-white drop-shadow-lg text-stroke-black">Great Job!</h2>
+            <p class="text-xl text-green-400 font-bold drop-shadow-md text-stroke-black">+ ₹20 Earned</p>
+        </div>
+    </div>
+
+    <script type="module" src="./js/app.js"></script>
+
+</body>
+</html>
