@@ -431,7 +431,7 @@ window.loadActive = function(id, o) {
     const timeEl = document.getElementById('actOrderTime');
     if(timeEl) timeEl.innerText = orderTime;
 
-    // --- ITEM LIST WITH PRICE ---
+    // --- ITEM LIST WITH PRICE & QTY (FIXED) ---
     const ul = document.getElementById('actItems');
     if(ul) {
         ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
@@ -440,10 +440,16 @@ window.loadActive = function(id, o) {
             const count = parseInt(i.count) || 1;
             const totalItemPrice = price * count;
 
+            // i.qty ko check karo aur use karo
+            const quantityText = i.qty ? `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">${i.qty}</span>` : '';
+
             return `
-            <li class="flex justify-between border-b border-gray-100 pb-1 last:border-0">
+            <li class="flex justify-between border-b border-gray-100 pb-1 last:border-0 items-center">
                 <div>
-                    <span class="text-gray-800">${i.name}</span>
+                    <div class="flex items-center">
+                        <span class="text-gray-800 font-medium">${i.name}</span>
+                        ${quantityText}
+                    </div>
                     <span class="text-[10px] text-gray-500 block">₹${price} x ${count}</span>
                 </div>
                 <span class="text-gray-900 font-bold">₹${totalItemPrice}</span>
@@ -551,3 +557,5 @@ window.updateStatus = function(st) {
 window.changeStatus = function() {
     if(window.activeOrder) updateBtnUI(window.activeOrder.status);
 }
+
+
