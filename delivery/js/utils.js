@@ -24,7 +24,7 @@ export function toggleMenu() {
 
 export function triggerCelebration() {
     if (typeof confetti === 'function') {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     }
     const overlay = document.getElementById('celebrationOverlay');
     if (overlay) {
@@ -48,51 +48,53 @@ export function getDistance(lat1, lon1, lat2, lon2) {
 }
 
 export function calculateOrderWeight(cart) {
-    if (!cart || !Array.isArray(cart)) return 0;
-    let totalKg = 0;
-    cart.forEach(item => {
-        if (item.qty === 'Special Request') return;
-        let txt = item.qty.toLowerCase().replace(/\s/g, '');
-        let weight = 0;
-        let mul = item.count || 1;
-        let match;
-
-        // Regex logic from original file
-        if (match = txt.match(/(\d+(\.\d+)?)kg/)) weight = parseFloat(match[1]);
-        else if ((match = txt.match(/(\d+)g/)) || (match = txt.match(/(\d+)gm/))) weight = parseFloat(match[1]) / 1000;
-        else if ((match = txt.match(/(\d+(\.\d+)?)l/)) || (match = txt.match(/(\d+(\.\d+)?)ltr/))) weight = parseFloat(match[1]);
-        else if (match = txt.match(/(\d+)ml/)) weight = parseFloat(match[1]) / 1000;
-
-        totalKg += (weight * mul);
-    });
-    return totalKg.toFixed(2);
+    let totalGm = 0;
+    if (cart && Array.isArray(cart)) {
+        cart.forEach(item => {
+            // Extract numbers from "500 gm", "1 kg" etc.
+            const match = item.qty.match(/(\d+)\s*(g|gm|kg|l|ml)/i);
+            if (match) {
+                let val = parseInt(match[1]);
+                let unit = match[2].toLowerCase();
+                if (unit === 'kg' || unit === 'l') val *= 1000;
+                totalGm += (val * (item.count || 1));
+            }
+        });
+    }
+    return (totalGm / 1000).toFixed(1); // Return in KG
 }
 
-// --- 3. MAP LOGIC (Uses global state) ---
+// --- 3. MAP & ROUTING LOGIC (Leaflet) ---
 
 export function initDeliveryMap(lat, lng) {
-    // If map already exists, just recenter it
+    const mapDiv = document.getElementById('deliveryMap');
+    if (!mapDiv) return;
+
+    // 1. Cleanup existing map instance
     if (state.mapInstance) {
-        state.mapInstance.invalidateSize();
-        state.mapInstance.setView([lat, lng], 14);
-        return;
+        state.mapInstance.off();
+        state.mapInstance.remove();
+        state.mapInstance = null;
     }
 
-    // Initialize Leaflet Map
-    const map = L.map('deliveryMap', {
-        zoomControl: true,
-        attributionControl: false
-    }).setView([lat, lng], 14);
+    // 2. Initialize Map
+    state.mapInstance = L.map('deliveryMap', { zoomControl: false }).setView([lat, lng], 15);
 
-    // Light Theme Tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }).addTo(map);
+    // 3. Add Tile Layer (OpenStreetMap)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(state.mapInstance);
 
-    // Save to State
-    state.mapInstance = map;
-    state.mapLayerGroup = L.layerGroup().addTo(map);
+    // 4. Add Current Location Marker (Pulse Effect)
+    const pulseIcon = L.divIcon({
+        className: 'custom-div-icon',
+        html: `<div style="width:15px;height:15px;background:#3b82f6;border-radius:50%;border:2px solid white;box-shadow:0 0 10px rgba(0,0,0,0.3);"></div>`,
+        iconSize: [15, 15],
+        iconAnchor: [7, 7]
+    });
+    L.marker([lat, lng], { icon: pulseIcon }).addTo(state.mapInstance);
 
+    // Hide Loader
     const loader = document.getElementById('mapLoader');
     if(loader) loader.classList.add('hidden');
 }
@@ -100,13 +102,22 @@ export function initDeliveryMap(lat, lng) {
 export function drawRoute(startLat, startLng, endLat, endLng) {
     if (!state.mapInstance) return;
 
-    // Clear old route
+    // Remove previous routing control
     if (state.mapRouteControl) {
-        try { state.mapInstance.removeControl(state.mapRouteControl); } catch (e) {}
-        state.mapRouteControl = null;
+        state.mapInstance.removeControl(state.mapRouteControl);
     }
 
-    // Create new route
+    // Define Destination Icon
+    const destIcon = L.divIcon({
+        html: '<i class="fa-solid fa-location-dot text-3xl text-red-600 drop-shadow-md"></i>',
+        className: 'bg-transparent',
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+    });
+
+    L.marker([endLat, endLng], { icon: destIcon }).addTo(state.mapInstance);
+
+    // Draw Route using Leaflet Routing Machine
     state.mapRouteControl = L.Routing.control({
         waypoints: [
             L.latLng(startLat, startLng),
@@ -115,17 +126,17 @@ export function drawRoute(startLat, startLng, endLat, endLng) {
         lineOptions: {
             styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6 }]
         },
-        createMarker: function() { return null; }, // Use our custom markers instead
+        createMarker: function() { return null; }, // We added custom markers manually
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
-        showAlternatives: false,
-        containerClassName: 'hidden-routing-container' // Hidden via CSS
+        show: false // Hide default text instructions
     }).on('routesfound', function(e) {
         const routes = e.routes;
         const summary = routes[0].summary;
 
-        // Update Dashboard Live Stats
+        // --- SMART DASHBOARD UPDATE ---
+        // Update Time & Distance boxes in the UI
         const distKm = (summary.totalDistance / 1000).toFixed(1);
         const timeMin = Math.round(summary.totalTime / 60);
 
@@ -140,19 +151,7 @@ export function drawRoute(startLat, startLng, endLat, endLng) {
 
 export function openMap(type, lat, lng) {
     if (!lat || !lng) return;
-    if (type === 'dir') window.open(`https://www.google.com/maps/dir/?api=1&destination=$${lat},${lng}`, '_blank');
-    else if (type === 'view') window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=$${lat},${lng}`, '_blank');
+    if (type === 'dir') window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
+    else if (type === 'view') window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`, '_blank');
 }
 
-export function triggerSOS(adminNumber) {
-    if(!confirm("⚠️ SEND EMERGENCY SOS? \nLocation will be shared with Admin & Team.")) return;
-
-    // Get current location from state or default
-    const lat = state.currentLat || 0;
-    const lng = state.currentLng || 0;
-    const name = state.user ? state.user.name : "Unknown Partner";
-    const mobile = state.user ? state.user.mobile : "Unknown Mobile";
-
-    const message = `🚨 *SOS EMERGENCY* 🚨\n\nPartner: ${name}\nPhone: ${mobile}\nLocation: https://maps.google.com/?q=$${lat},${lng}\n\n*Call Immediately!*`;
-    window.open(`https://wa.me/91${adminNumber}?text=${encodeURIComponent(message)}`, '_blank');
-}

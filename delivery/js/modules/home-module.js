@@ -8,10 +8,11 @@ import { toggleMenu, showToast } from '../utils.js';
 import { HomeActions } from './home-actions.js'; // Logic Import
 
 export const HomeModule = {
-    // 1. HTML TEMPLATE (View)
+    // 1. HTML TEMPLATE (View) - EXACT COPY OF delivery-home.html
     render: () => {
         const user = state.user || {};
         return `
+        <!-- HEADER -->
         <header class="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-30 px-4 py-3 flex items-center justify-between shadow-sm">
             <div class="flex items-center gap-3">
                 <button id="menuBtn" class="w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900 transition active:scale-95 bg-gray-100 rounded-full">
@@ -37,6 +38,7 @@ export const HomeModule = {
             </div>
         </header>
 
+        <!-- SIDEBAR -->
         <div id="menuOverlay" class="overlay fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"></div>
         <div id="sidebar" class="sidebar fixed top-0 left-0 h-full w-[80%] max-w-[280px] bg-white z-50 shadow-2xl flex flex-col border-r border-gray-200">
             <div class="p-6 bg-gray-50 border-b border-gray-200">
@@ -45,19 +47,38 @@ export const HomeModule = {
                 </div>
                 <h2 class="font-bold text-lg text-gray-900">${user.name}</h2>
                 <p class="text-xs text-gray-500 font-mono">+91 ${user.mobile}</p>
+                <div class="mt-2 flex gap-1 justify-center">
+                    <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                    <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                    <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                    <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                    <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+                </div>
             </div>
             <nav class="flex-1 p-4 space-y-2">
-                <button id="changePinBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition"><i class="fa-solid fa-key text-amber-500 w-5"></i> Change PIN</button>
-                <button id="historyBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition"><i class="fa-solid fa-clock-rotate-left text-amber-500 w-5"></i> Settlement History</button>
-                <button id="vehInfoBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition"><i class="fa-solid fa-motorcycle text-amber-500 w-5"></i> Vehicle Info</button>
-                <button id="addWsBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition"><i class="fa-solid fa-store text-amber-500 w-5"></i> Add Wholesaler Shop</button>
+                <button id="changePinBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-key text-amber-500 w-5"></i> Change PIN
+                </button>
+                <button id="historyBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-clock-rotate-left text-amber-500 w-5"></i> Settlement History
+                </button>
+                <button id="vehInfoBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-motorcycle text-amber-500 w-5"></i> Vehicle Info
+                </button>
+                <button id="addWsBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-gray-100 text-gray-700 font-semibold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-store text-amber-500 w-5"></i> Add Wholesaler Shop
+                </button>
                 <div class="h-px bg-gray-200 my-2"></div>
-                <button id="logoutBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 font-semibold text-sm flex items-center gap-3 transition"><i class="fa-solid fa-power-off w-5"></i> Logout</button>
+                <button id="logoutBtn" class="w-full text-left px-4 py-3 rounded-lg hover:bg-red-50 text-red-600 font-semibold text-sm flex items-center gap-3 transition">
+                    <i class="fa-solid fa-power-off w-5"></i> Logout
+                </button>
             </nav>
         </div>
 
+        <!-- MAIN CONTENT -->
         <div class="px-4 mt-20 pb-24">
 
+            <!-- WHOLESALER STRIP -->
             <div id="wholesalerStrip" class="hidden mb-4">
                 <div class="flex justify-between items-end mb-2 px-1">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-shop text-amber-600 mr-1"></i> Nearby Wholesalers</h3>
@@ -66,6 +87,7 @@ export const HomeModule = {
                 <div id="wsListContainer" class="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x w-full"></div>
             </div>
 
+            <!-- RADIUS CONTROL -->
             <div id="radiusControl" class="hidden bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-crosshairs text-amber-600 mr-1"></i> Scanning Range</h3>
@@ -75,6 +97,7 @@ export const HomeModule = {
                 <p class="text-[10px] text-gray-400 mt-1 text-center font-medium">Showing orders within this circle.</p>
             </div>
 
+            <!-- STATS SECTION -->
             <div id="statsSection" class="hidden grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-white rounded-xl p-3 border border-gray-200 flex flex-col items-center shadow-sm">
                     <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Earnings</span>
@@ -86,6 +109,7 @@ export const HomeModule = {
                 </div>
             </div>
 
+            <!-- STATES -->
             <div id="offlineState" class="flex flex-col items-center justify-center py-12 text-center">
                 <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-gray-400 shadow-inner"><i class="fa-solid fa-power-off text-3xl"></i></div>
                 <h2 class="text-lg font-bold text-gray-700">You are Offline</h2>
@@ -109,16 +133,21 @@ export const HomeModule = {
                 <div id="ordersList" class="space-y-4"></div>
             </div>
 
+            <!-- ACTIVE ORDER PANEL (Restored Design) -->
             <div id="activeOrderPanel" class="hidden fixed inset-0 z-50 bg-gray-50 flex flex-col animate-[slideUp_0.3s_ease-out]">
                 <div class="bg-white p-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
                     <h2 class="font-bold text-amber-600">Live Task</h2>
                     <span class="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded uppercase font-bold" id="activeStatus">Processing</span>
                 </div>
+
                 <div class="flex-1 overflow-y-auto p-4 space-y-4">
+                    <!-- Live Map & Dashboard -->
                     <div id="liveMapSection" class="hidden animate-[fadeIn_0.5s_ease-out]">
                         <div class="flex justify-between items-end mb-2">
                             <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-map text-blue-500 mr-1"></i> Smart Route</h3>
-                            <button id="recenterBtn" class="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded font-bold hover:bg-blue-600 hover:text-white transition flex items-center gap-1"><i class="fa-solid fa-location-crosshairs"></i> Recenter</button>
+                            <button id="recenterBtn" class="text-[10px] bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded font-bold hover:bg-blue-600 hover:text-white transition flex items-center gap-1">
+                                <i class="fa-solid fa-location-crosshairs"></i> Recenter
+                            </button>
                         </div>
                         <div class="map-container shadow-md bg-white">
                             <div id="deliveryMap"></div>
@@ -127,9 +156,14 @@ export const HomeModule = {
                                 <span class="text-gray-600 text-xs font-bold">Connecting GPS...</span>
                             </div>
                         </div>
+
+                        <!-- Smart Dashboard (Carousel) -->
                         <div id="smartDashboard" class="flex gap-2 mt-3 h-20">
                             <div class="w-[75%] bg-white rounded-xl border border-gray-200 p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-center">
                                 <div id="activeWholesalerCard"><p class="text-[10px] text-gray-400 text-center">Loading Shops...</p></div>
+                                <button id="btnNextShop" class="absolute right-0 top-0 bottom-0 w-6 bg-gray-100 hover:bg-gray-200 border-l border-gray-200 flex items-center justify-center text-gray-500 transition hidden">
+                                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                                </button>
                             </div>
                             <div class="w-[25%] bg-blue-50 rounded-xl border border-blue-100 p-2 shadow-sm flex flex-col items-center justify-center text-center">
                                 <p class="text-[9px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">Time</p>
@@ -145,10 +179,12 @@ export const HomeModule = {
                         <p class="text-lg font-bold text-gray-900 mt-0.5" id="actShop">You</p>
                         <p class="text-xs text-green-600 font-bold flex items-center gap-1" id="actShopLoc"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Live Tracking Active</p>
                     </div>
+
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 pb-2">Order Items</h4>
                         <ul id="actItems" class="text-sm text-gray-700 space-y-2 font-medium"></ul>
                     </div>
+
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 pb-2">Trip & Preferences</h4>
                         <div class="grid grid-cols-2 gap-3">
@@ -159,6 +195,7 @@ export const HomeModule = {
                         </div>
                         <div id="actExtraDetails" class="mt-3 space-y-2"></div>
                     </div>
+
                     <div class="relative pl-6 border-l-2 border-gray-200 ml-1">
                         <span class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow-sm"></span>
                         <h3 class="text-xs font-bold text-gray-400 uppercase">Deliver To</h3>
@@ -171,13 +208,12 @@ export const HomeModule = {
                         </div>
                     </div>
 
-                    <!-- UPDATED LABEL FOR TOTAL CASH COLLECTION -->
                     <div class="bg-white p-4 rounded-xl flex justify-between items-center border border-gray-200 shadow-sm">
                         <span class="text-sm text-gray-500 font-bold">Total Bill (Collect Cash)</span>
                         <span class="text-2xl font-bold text-gray-900">₹<span id="actFee">0</span></span>
                     </div>
-
                 </div>
+
                 <div class="p-5 bg-white border-t border-gray-200 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                     <button id="actionBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 active:scale-95 transition">UPDATE STATUS</button>
                 </div>
@@ -192,14 +228,10 @@ export const HomeModule = {
                     </div>
                     <button id="closeHistModal" class="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div id="settlementList" class="flex-1 overflow-y-auto p-4 space-y-3">
-                    <div class="text-center py-10 opacity-50">
-                        <i class="fa-solid fa-clock-rotate-left text-3xl text-gray-300 mb-2"></i>
-                        <p class="text-xs text-gray-400 font-bold">Loading records...</p>
-                    </div>
-                </div>
+                <div id="settlementList" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
             </div>
 
+            <!-- WHOLESALER MODAL -->
             <div id="wholesalerModal" class="hidden fixed inset-0 z-[100] bg-gray-50 flex flex-col w-full h-full modal-animate">
                 <div class="bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-center relative shadow-md shrink-0">
                     <button id="closeWsModal" class="absolute top-4 left-4 w-8 h-8 flex items-center justify-center bg-white/20 rounded-full text-white hover:bg-white/30 transition"><i class="fa-solid fa-arrow-left"></i></button>
@@ -296,3 +328,5 @@ export const HomeModule = {
         document.getElementById('btnWsSubmit').onclick = HomeActions.submitWholesalerRequest;
     }
 };
+
+

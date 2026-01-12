@@ -34,42 +34,53 @@ export const HomeActions = {
             }
         });
 
-        // B. Approved Wholesalers Listener
+        // B. Approved Wholesalers Listener (Load once & Cache)
         db.ref('wholesalerRequests').orderByChild('status').equalTo('approved').on('value', snap => {
             state.approvedWholesalers = [];
             if(snap.exists()) snap.forEach(c => state.approvedWholesalers.push({ id: c.key, ...c.val() }));
+
             // Refresh UI if online
             const dutySwitch = document.getElementById('dutySwitch');
             if(dutySwitch && dutySwitch.checked) HomeActions.updateWholesalerDisplay();
         });
 
-        // C. Active Order Monitor
+        // C. Active Order Monitor (Refined for Refresh Persistence)
         db.ref('orders').orderByChild('deliveryBoyId').equalTo(state.user.mobile).on('value', snap => {
+            let foundActive = false;
+
             if(snap.exists()) {
-                let foundActive = false;
                 snap.forEach(c => {
                     const o = c.val();
-                    // If order is active (not delivered), load it
-                    if(o.status !== 'delivered') {
+                    // Check active status (Not delivered AND Not cancelled)
+                    if(o.status !== 'delivered' && o.status !== 'cancelled') {
                         state.activeOrder = { id: c.key, ...o };
-                        HomeActions.renderActiveOrderUI();
                         foundActive = true;
 
-                        // Auto-Switch Duty ON
+                        // FORCE UI RENDER & DUTY ON
                         const dutySwitch = document.getElementById('dutySwitch');
                         if(dutySwitch && !dutySwitch.checked) { 
                             dutySwitch.checked = true; 
                             HomeActions.toggleDuty(true); 
                         }
+                        HomeActions.renderActiveOrderUI();
                     }
                 });
-                // If no active order found, reset UI
-                if(!foundActive) {
-                    state.activeOrder = null;
-                    document.getElementById('activeOrderPanel').classList.add('hidden');
-                    document.getElementById('statsSection').classList.remove('hidden');
-                    document.getElementById('ordersContainer').classList.remove('hidden');
-                    document.getElementById('radiusControl').classList.remove('hidden');
+            }
+
+            // If no active order found, ensure we are in "List Mode"
+            if(!foundActive) {
+                state.activeOrder = null;
+                const panel = document.getElementById('activeOrderPanel');
+                if(panel && !panel.classList.contains('hidden')) {
+                    panel.classList.add('hidden');
+                    // Show Dashboard elements
+                    const dutySwitch = document.getElementById('dutySwitch');
+                    if(dutySwitch && dutySwitch.checked) {
+                        document.getElementById('statsSection').classList.remove('hidden');
+                        document.getElementById('ordersContainer').classList.remove('hidden');
+                        document.getElementById('radiusControl').classList.remove('hidden');
+                        document.getElementById('wholesalerStrip').classList.remove('hidden');
+                    }
                 }
             }
         });
@@ -85,14 +96,20 @@ export const HomeActions = {
             // UI Updates
             if(statusTxt) { statusTxt.innerText = "ONLINE"; statusTxt.classList.add('text-green-600'); }
             document.getElementById('offlineState').classList.add('hidden');
-            document.getElementById('statsSection').classList.remove('hidden');
-            document.getElementById('radiusControl').classList.remove('hidden');
 
             // Logic Updates
             db.ref('deliveryBoys/'+state.user.mobile+'/status').onDisconnect().set('offline');
             HomeActions.startGPS();
             HomeActions.startHeartbeat();
             HomeActions.listenOrders();
+            HomeActions.updateWholesalerDisplay();
+
+            // If NO active order, show normal dashboard
+            if(!state.activeOrder) {
+                document.getElementById('statsSection').classList.remove('hidden');
+                document.getElementById('radiusControl').classList.remove('hidden');
+                document.getElementById('ordersContainer').classList.remove('hidden');
+            }
         } else {
             // UI Updates
             if(statusTxt) { statusTxt.innerText = "OFFLINE"; statusTxt.classList.remove('text-green-600'); }
@@ -107,7 +124,7 @@ export const HomeActions = {
             HomeActions.stopGPS();
             if(state.heartbeatInterval) clearInterval(state.heartbeatInterval);
             db.ref('deliveryBoys/'+state.user.mobile+'/status').set('offline');
-            db.ref('orders').off(); // Stop listening
+            db.ref('orders').off(); 
         }
     },
 
@@ -134,7 +151,8 @@ export const HomeActions = {
                 }
 
                 if(state.activeOrder) HomeActions.updateActiveDistance();
-                HomeActions.listenOrders(); // Re-sort orders based on new location
+                HomeActions.listenOrders(); 
+                HomeActions.updateWholesalerDisplay(); // Update nearest list dynamically
             }, null, { enableHighAccuracy: true, maximumAge: 10000 });
         }
     },
@@ -191,13 +209,11 @@ export const HomeActions = {
 
     renderOrderCard: (id, o, dist, container) => {
         const div = document.createElement('div');
-        div.className = "glass-card p-4 rounded-xl relative mb-4 bg-white";
+        div.className = "glass-card p-4 rounded-xl relative mb-4 bg-white shadow-sm border border-slate-100";
 
-        // Dynamic IDs for buttons
         const btnId = `btn-accept-${id}`;
         const mapId = `btn-map-${id}`;
 
-        // --- Show Total Bill Amount ---
         let totalBill = 0;
         if(o.totalAmount) totalBill = o.totalAmount;
         else if(o.payment && o.payment.grandTotal) totalBill = o.payment.grandTotal;
@@ -222,7 +238,6 @@ export const HomeActions = {
         `;
         container.appendChild(div);
 
-        // Bind Events Directly
         document.getElementById(btnId).onclick = () => HomeActions.acceptOrder(id);
         document.getElementById(mapId).onclick = () => openMap('dir', o.location.lat, o.location.lng);
     },
@@ -244,12 +259,12 @@ export const HomeActions = {
         });
     },
 
-    // --- 4. ACTIVE ORDER UI ---
+    // --- 4. ACTIVE ORDER UI (Restored from delivery-home.html) ---
     renderActiveOrderUI: () => {
         const o = state.activeOrder;
         if(!o) return;
 
-        // Hide Order List, Show Active Panel
+        // Force Panel Show & Hide Dashboard
         document.getElementById('ordersContainer').classList.add('hidden');
         document.getElementById('noOrdersState').classList.add('hidden');
         document.getElementById('radiusControl').classList.add('hidden');
@@ -257,27 +272,38 @@ export const HomeActions = {
         document.getElementById('activeOrderPanel').classList.remove('hidden');
         document.getElementById('liveMapSection').classList.remove('hidden');
 
-        // Populate Data
+        // Populate Order Details
+        const orderIdDisp = o.orderId || o.id.slice(-6).toUpperCase();
+        document.getElementById('actOrderId').innerText = "#" + orderIdDisp;
+
+        const timestamp = o.timestamp || Date.now();
+        const dateObj = new Date(timestamp);
+        document.getElementById('actOrderDate').innerText = dateObj.toLocaleDateString('en-IN');
+        document.getElementById('actOrderTime').innerText = dateObj.toLocaleTimeString('en-IN', {hour: '2-digit', minute:'2-digit'});
+
+        // Customer Details
         document.getElementById('actCust').innerText = o.user.name;
         document.getElementById('actAddr').innerText = o.location.address;
 
-        // --- Show Total Collectable Amount ---
+        // Payment & Amount
         let totalCollect = 0;
         if(o.totalAmount) totalCollect = o.totalAmount;
         else if(o.payment && o.payment.grandTotal) totalCollect = o.payment.grandTotal;
-
         document.getElementById('actFee').innerText = totalCollect;
 
+        const pMode = (o.payment && o.payment.mode) ? o.payment.mode : 'COD';
+        document.getElementById('actPayMode').innerText = pMode;
+
+        // Preferences
         document.getElementById('actPrefTime').innerText = o.preferences.deliveryTime;
         document.getElementById('actPrefBudget').innerText = o.preferences.budget;
 
-        // --- Order Items List with Prices ---
+        // Item List with Price
         const ul = document.getElementById('actItems');
         ul.innerHTML = o.cart.map(i => {
             const price = parseFloat(i.price) || 0;
             const count = i.count || 1;
             const lineTotal = price * count;
-
             return `
             <li class="flex justify-between items-start border-b border-gray-100 pb-2 mb-2 last:border-0 last:mb-0 last:pb-0">
                 <div class="flex-1 pr-2">
@@ -291,17 +317,17 @@ export const HomeActions = {
             </li>`;
         }).join('');
 
-        // Weight Calculation
+        // Weight
         document.getElementById('actExtraDetails').innerHTML = `<div class="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200 mt-2"><span class="text-[10px] text-gray-400 font-bold uppercase">Total Weight</span><span class="text-sm font-bold text-gray-800">${calculateOrderWeight(o.cart)} KG</span></div>`;
 
-        // Map Setup (Delayed slightly to ensure DOM is ready)
+        // Map Delay to ensure container visibility
         setTimeout(() => {
             initDeliveryMap(state.currentLat, state.currentLng);
             drawRoute(state.currentLat, state.currentLng, o.location.lat, o.location.lng);
             HomeActions.renderWholesalerWidget();
         }, 500);
 
-        // Configure Main Action Button
+        // Action Button Logic
         const btn = document.getElementById('actionBtn');
         const status = document.getElementById('activeStatus');
 
@@ -319,7 +345,6 @@ export const HomeActions = {
             btn.onclick = () => HomeActions.updateStatus('delivered');
         }
 
-        // Bind Nav Buttons
         document.getElementById('navBtn').onclick = () => openMap('dir', o.location.lat, o.location.lng);
         document.getElementById('waBtn').onclick = () => window.open(`https://wa.me/91${o.user.mobile}`, '_blank');
         document.getElementById('callBtn').onclick = () => window.open(`tel:${o.user.mobile}`);
@@ -334,11 +359,11 @@ export const HomeActions = {
 
         db.ref('orders/'+state.activeOrder.id).update(updates).then(() => {
             if(st === 'delivered') {
-                // Update Earnings
+                // Atomic updates for Earnings/Trips
                 db.ref('deliveryBoys/'+state.user.mobile+'/earnings').transaction(c => (c || 0) + PARTNER_PAY);
                 db.ref('deliveryBoys/'+state.user.mobile+'/trips').transaction(c => (c || 0) + 1);
 
-                // Close Order
+                // Complete Order
                 db.ref('orders/'+state.activeOrder.id).update({ 
                     completedAt: firebase.database.ServerValue.TIMESTAMP, 
                     partnerPay: PARTNER_PAY 
@@ -356,15 +381,12 @@ export const HomeActions = {
         document.getElementById('actDist').innerText = d + " KM";
     },
 
-    // --- 5. SIDEBAR, HISTORY & WHOLESALER ACTIONS ---
+    // --- 5. SIDEBAR & WHOLESALER ACTIONS (SORT + LIMIT 5) ---
     changePin: () => {
         const p = prompt("Enter New PIN (4 Digits):");
         if(p && p.length === 4) {
-            db.ref('deliveryBoys/'+state.user.mobile).update({pin:p})
-              .then(() => showToast("PIN Changed Successfully"));
-        } else if(p) {
-            showToast("Invalid PIN. Must be 4 digits.");
-        }
+            db.ref('deliveryBoys/'+state.user.mobile).update({pin:p}).then(() => showToast("PIN Changed Successfully"));
+        } else if(p) showToast("Invalid PIN. Must be 4 digits.");
     },
 
     updateVehicle: () => {
@@ -378,71 +400,6 @@ export const HomeActions = {
         }
     },
 
-    openSettlementHistory: () => {
-        const modal = document.getElementById('historyModal');
-        const list = document.getElementById('settlementList');
-        if(!modal || !list) return;
-
-        modal.classList.remove('hidden');
-        list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fa-solid fa-clock-rotate-left text-3xl text-gray-300 mb-2"></i><p class="text-xs text-gray-400 font-bold">Loading records...</p></div>`;
-
-        db.ref('deliveryBoys/' + state.user.mobile + '/settlementHistory').once('value', snap => {
-            if(snap.exists()) {
-                list.innerHTML = '';
-                const history = [];
-
-                snap.forEach(c => {
-                    // SAFE CHECK: Ensure data is an object before using it
-                    const val = c.val();
-                    if(typeof val === 'object' && val !== null) {
-                        history.push(val);
-                    } else {
-                        // Fallback for simple data
-                        console.log("Found raw data:", val); 
-                    }
-                });
-
-                // Sort: Latest First
-                if(history.length > 0) history.reverse();
-
-                history.forEach(item => {
-                    // SAFE CHECKS: Fallback values if database keys are different
-                    const amount = item.amount || item.Amount || 0;
-                    const status = item.status || item.Status || 'completed';
-                    const timeVal = item.timestamp || item.Timestamp || item.date || Date.now();
-
-                    const date = new Date(timeVal).toLocaleString('en-IN', {
-                        day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'
-                    });
-
-                    const isPaid = status.toLowerCase() === 'completed';
-                    const colorClass = isPaid ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100';
-                    const icon = isPaid ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-clock"></i>';
-
-                    const div = document.createElement('div');
-                    div.className = `flex justify-between items-center p-3 rounded-xl border ${colorClass} mb-2 shadow-sm`;
-                    div.innerHTML = `
-                        <div>
-                            <p class="font-bold text-sm">Amount: ₹${amount}</p>
-                            <p class="text-[10px] opacity-70 font-medium">${date}</p>
-                        </div>
-                        <div class="text-xs font-bold uppercase tracking-wide flex items-center gap-1">
-                            ${icon} ${status}
-                        </div>
-                    `;
-                    list.appendChild(div);
-                });
-
-                if(history.length === 0) {
-                     list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fa-solid fa-circle-exclamation text-3xl text-gray-300 mb-2"></i><p class="text-xs text-gray-400 font-bold">Data format mismatch.</p></div>`;
-                }
-
-            } else {
-                list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fa-solid fa-box-open text-3xl text-gray-300 mb-2"></i><p class="text-xs text-gray-400 font-bold">No history found</p></div>`;
-            }
-        });
-    },
-
     updateWholesalerDisplay: () => {
         const strip = document.getElementById('wholesalerStrip');
         const container = document.getElementById('wsListContainer');
@@ -453,12 +410,23 @@ export const HomeActions = {
         }
 
         strip.classList.remove('hidden'); container.innerHTML = '';
-        state.approvedWholesalers.forEach(ws => {
-            const d = getDistance(state.currentLat, state.currentLng, ws.location.lat, ws.location.lng);
+
+        // 1. Calculate Distance
+        const shopsWithDist = state.approvedWholesalers.map(ws => ({
+            ...ws,
+            dist: parseFloat(getDistance(state.currentLat, state.currentLng, ws.location.lat, ws.location.lng))
+        }));
+
+        // 2. Sort (Nearest First) & Limit Top 5
+        shopsWithDist.sort((a, b) => a.dist - b.dist);
+        const top5Shops = shopsWithDist.slice(0, 5);
+
+        // 3. Render
+        top5Shops.forEach(ws => {
             const div = document.createElement('div');
             div.className = "flex-shrink-0 w-64 bg-white border border-gray-200 rounded-xl p-3 relative snap-center shadow-sm";
             div.innerHTML = `
-                <div class="flex justify-between items-start mb-2"><h4 class="font-bold text-gray-900 text-sm truncate w-3/4">${ws.shopName}</h4><span class="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded font-bold">${d} KM</span></div>
+                <div class="flex justify-between items-start mb-2"><h4 class="font-bold text-gray-900 text-sm truncate w-3/4">${ws.shopName}</h4><span class="text-[10px] bg-amber-50 text-amber-600 border border-amber-100 px-1.5 py-0.5 rounded font-bold">${ws.dist} KM</span></div>
                 <p class="text-[10px] text-gray-500 mb-3 truncate"><i class="fa-solid fa-location-dot mr-1"></i>${ws.address}</p>
                 <div class="flex gap-2"><button onclick="window.open('tel:${ws.ownerMobile}')" class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-phone text-xs"></i></button><button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${ws.location.lat},${ws.location.lng}')" class="bg-blue-50 hover:bg-blue-100 text-blue-600 w-8 h-8 rounded-lg flex items-center justify-center"><i class="fa-solid fa-location-arrow text-xs"></i></button></div>
             `;
@@ -485,19 +453,15 @@ export const HomeActions = {
             lng: document.getElementById('wsLng'),
             id: document.getElementById('wsEditId')
         };
-
         const data = {
             partnerMobile: state.user.mobile, partnerName: state.user.name,
             shopName: els.name.value, ownerMobile: els.mobile.value, address: els.addr.value,
             location: { lat: parseFloat(els.lat.value), lng: parseFloat(els.lng.value) },
             status: 'pending', timestamp: firebase.database.ServerValue.TIMESTAMP
         };
-
         if(!data.shopName || !data.location.lat) return showToast("Please Fill All Details & Connect Location");
-
         if(els.id.value) db.ref('wholesalerRequests/'+els.id.value).update(data);
         else db.ref('wholesalerRequests').push(data);
-
         showToast("Request Submitted!"); 
         els.name.value = ''; els.id.value = ''; 
         HomeActions.loadMyRequests();
@@ -513,6 +477,50 @@ export const HomeActions = {
                 list.innerHTML += `<div class="bg-white p-3 rounded-xl border border-gray-200 mb-2"><h4 class="font-bold text-sm">${r.shopName}</h4><p class="text-[10px] text-gray-500">${r.status.toUpperCase()}</p></div>`;
             });
         });
+    },
+
+    openSettlementHistory: () => {
+        const modal = document.getElementById('historyModal');
+        const list = document.getElementById('settlementList');
+        if(!modal || !list) return;
+
+        modal.classList.remove('hidden');
+        list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fa-solid fa-clock-rotate-left text-3xl text-gray-300 mb-2"></i><p class="text-xs text-gray-400 font-bold">Loading records...</p></div>`;
+
+        db.ref('deliveryBoys/' + state.user.mobile + '/settlementHistory').once('value', snap => {
+            if(snap.exists()) {
+                list.innerHTML = '';
+                const history = [];
+                snap.forEach(c => {
+                    const val = c.val();
+                    if(typeof val === 'object' && val !== null) history.push(val);
+                });
+                if(history.length > 0) history.reverse();
+
+                history.forEach(item => {
+                    const amount = item.amount || item.Amount || 0;
+                    const status = item.status || item.Status || 'completed';
+                    const timeVal = item.timestamp || item.Timestamp || item.date || Date.now();
+                    const date = new Date(timeVal).toLocaleString('en-IN', {
+                        day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'
+                    });
+                    const isPaid = status.toLowerCase() === 'completed';
+                    const colorClass = isPaid ? 'bg-green-50 text-green-700 border-green-100' : 'bg-amber-50 text-amber-700 border-amber-100';
+                    const icon = isPaid ? '<i class="fa-solid fa-circle-check"></i>' : '<i class="fa-solid fa-clock"></i>';
+
+                    const div = document.createElement('div');
+                    div.className = `flex justify-between items-center p-3 rounded-xl border ${colorClass} mb-2 shadow-sm`;
+                    div.innerHTML = `
+                        <div><p class="font-bold text-sm">Amount: ₹${amount}</p><p class="text-[10px] opacity-70 font-medium">${date}</p></div>
+                        <div class="text-xs font-bold uppercase tracking-wide flex items-center gap-1">${icon} ${status}</div>
+                    `;
+                    list.appendChild(div);
+                });
+            } else {
+                list.innerHTML = `<div class="text-center py-10 opacity-50"><i class="fa-solid fa-box-open text-3xl text-gray-300 mb-2"></i><p class="text-xs text-gray-400 font-bold">No history found</p></div>`;
+            }
+        });
     }
 };
+
 
