@@ -63,7 +63,7 @@ window.onload = () => {
     if(els.vehicleType) els.vehicleType.innerText = window.session.vehicle;
     if(els.menuName) els.menuName.innerText = window.session.name;
     if(els.menuMobile) els.menuMobile.innerText = '+91 ' + window.session.mobile;
-    
+
     if(els.radiusSlider) els.radiusSlider.value = serviceRadius;
     if(els.radiusVal) els.radiusVal.innerText = serviceRadius;
     if(els.scanKm) els.scanKm.innerText = serviceRadius;
@@ -83,7 +83,7 @@ window.onload = () => {
         els.dutySwitch.checked = true;
         toggleDuty();
     }
-    
+
     fetchEarnings(); 
     fetchApprovedWholesalersList(); 
     checkForActive();
@@ -93,17 +93,17 @@ window.onload = () => {
 window.toggleDuty = function() {
     const switchEl = document.getElementById('dutySwitch');
     if(!switchEl) return;
-    
+
     window.isOnline = switchEl.checked;
     localStorage.setItem('rmz_duty_on', window.isOnline);
     const status = document.getElementById('dutyStatusText');
-    
+
     if(window.isOnline) {
         if(status) { status.innerText = "ONLINE"; status.classList.add('text-green-600'); }
         document.getElementById('offlineState').classList.add('hidden');
         document.getElementById('statsSection').classList.remove('hidden');
         document.getElementById('radiusControl').classList.remove('hidden');
-        
+
         window.db.ref('deliveryBoys/'+window.session.mobile+'/status').onDisconnect().set('offline');
         startGPS();
         startHeartbeat();
@@ -117,7 +117,7 @@ window.toggleDuty = function() {
         document.getElementById('statsSection').classList.add('hidden');
         document.getElementById('radiusControl').classList.add('hidden');
         document.getElementById('wholesalerStrip').classList.add('hidden');
-        
+
         stopGPS();
         stopHeartbeat();
         window.db.ref('deliveryBoys/'+window.session.mobile+'/status').set('offline');
@@ -145,7 +145,7 @@ async function pingServer() {
     if(!window.isOnline) return;
     let batteryLevel = 'Unknown';
     try { if(navigator.getBattery) { const battery = await navigator.getBattery(); batteryLevel = Math.round(battery.level * 100) + '%'; } } catch(e) {}
-    
+
     const updates = { 
         lastHeartbeat: firebase.database.ServerValue.TIMESTAMP, 
         status: 'online', 
@@ -159,38 +159,35 @@ function startGPS() {
     if("geolocation" in navigator) {
         // Force update status immediately on start
         window.db.ref('deliveryBoys/'+window.session.mobile).update({status:'online'});
-        
+
         watchId = navigator.geolocation.watchPosition(p => {
             const newLat = p.coords.latitude;
             const newLng = p.coords.longitude;
-            
+
             // Update Global Variables (Always keep these live for UI)
             window.myLat = newLat;
             window.myLng = newLng;
-            
+
             const locStatus = document.getElementById('locStatus');
             if(locStatus) locStatus.innerText = "GPS Live";
-            
+
             // --- SMART GPS LOGIC (Bandwidth Saver) ---
             // Calculate distance from last SENT location
             const distMoved = parseFloat(window.getDistance(lastSentLat, lastSentLng, newLat, newLng));
-            
+
             // Only update Firebase if moved > 30 meters (0.03 KM) OR if it's the first update
             if(distMoved >= GPS_UPDATE_THRESHOLD_KM || (lastSentLat === 0 && lastSentLng === 0)) {
-                
+
                 window.db.ref('deliveryBoys/'+window.session.mobile).update({
                     status:'online',
                     location:{lat:newLat, lng:newLng},
                     lastUpdated: firebase.database.ServerValue.TIMESTAMP
                 });
-                
+
                 // Update "Last Sent" coordinates
                 lastSentLat = newLat;
                 lastSentLng = newLng;
-                
-                // console.log("📡 GPS Sent to Server (Moved: " + (distMoved*1000).toFixed(0) + "m)");
-            } else {
-                // console.log("Skipping Server Update (Moved only: " + (distMoved*1000).toFixed(0) + "m)");
+
             }
 
             // --- LOCAL UI UPDATES (Run on EVERY pulse for smoothness) ---
@@ -203,9 +200,9 @@ function startGPS() {
                 if(window.renderActiveWholesalerWidget) window.renderActiveWholesalerWidget(); 
             }
             if(window.updateWholesalerDisplay) window.updateWholesalerDisplay();
-            
+
             listenOrders(); // Re-scan orders locally
-            
+
         }, e => {
             const locStatus = document.getElementById('locStatus');
             if(locStatus) locStatus.innerText = "GPS Weak";
@@ -251,13 +248,13 @@ window.listenOrders = function() {
         if(!window.isOnline) return;
         list.innerHTML = '';
         let count = 0;
-        
+
         if(snap.exists()) {
             Object.entries(snap.val()).forEach(([id, o]) => {
                 const dist = parseFloat(window.getDistance(window.myLat, window.myLng, o.location.lat, o.location.lng));
                 const isInRange = dist <= parseFloat(serviceRadius);
                 const isMyOrder = (o.status === 'accepted' && o.deliveryBoyId === window.session.mobile);
-                
+
                 if((o.status === 'placed' && isInRange) || isMyOrder) {
                     count++;
                     const shopName = o.user && o.user.shopName ? o.user.shopName : "Unknown Shop";
@@ -265,7 +262,7 @@ window.listenOrders = function() {
                     const fee = o.payment && o.payment.deliveryFee ? o.payment.deliveryFee : 0;
                     const prefTime = o.preferences && o.preferences.deliveryTime ? o.preferences.deliveryTime : "Standard";
                     const prefBudg = o.preferences && o.preferences.budget ? o.preferences.budget : "Standard";
-                    
+
                     let orderTime = "N/A";
                     if(o.timestamp) {
                         const d = new Date(o.timestamp);
@@ -294,7 +291,7 @@ window.listenOrders = function() {
                     let prodTxt = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => `${i.count}x ${i.name}`).join(', ') : 'Items';
                     const div = document.createElement('div');
                     div.className = `${cardClass} p-4 rounded-xl relative mb-4`;
-                    
+
                     const safeOrder = JSON.stringify(o).replace(/"/g, '"');
                     const mapAction = `openMapDirect(${o.location.lat},${o.location.lng})`;
                     const btnDisabled = (window.activeOrder && window.activeOrder.id !== id) ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : '';
@@ -337,10 +334,10 @@ window.listenOrders = function() {
                 }
             });
         }
-        
+
         const oc = document.getElementById('orderCount');
         if(oc) oc.innerText = count;
-        
+
         if(!window.activeOrder) {
             if(count > 0) {
                 document.getElementById('noOrdersState').classList.add('hidden');
@@ -359,7 +356,7 @@ window.listenOrders = function() {
 window.acceptOrder = function(id) {
     if(window.activeOrder) return showToast("Complete current order first!");
     if(!confirm("Are you sure you want to accept?")) return;
-    
+
     window.db.ref('orders/'+id).transaction(o => {
         if(o && (o.status === 'placed')) {
             o.status = 'accepted'; 
@@ -410,11 +407,10 @@ window.loadActive = function(id, o) {
     document.getElementById('radiusControl').classList.add('hidden');
     document.getElementById('activeOrderPanel').classList.remove('hidden');
     document.getElementById('wholesalerStrip').classList.add('hidden'); 
-    
+
     // Fill Details
     const custName = o.user && o.user.name ? o.user.name : "Customer";
     const address = o.location && o.location.address ? o.location.address : "Unknown Address";
-    const fee = o.payment && o.payment.deliveryFee ? o.payment.deliveryFee : 0;
     const prefTime = o.preferences && o.preferences.deliveryTime ? o.preferences.deliveryTime : "Standard";
     const prefBudg = o.preferences && o.preferences.budget ? o.preferences.budget : "Standard";
 
@@ -423,7 +419,6 @@ window.loadActive = function(id, o) {
     document.getElementById('actShopLoc').innerText = "Your GPS is Live Tracking";
     document.getElementById('actCust').innerText = custName;
     document.getElementById('actAddr').innerText = address;
-    document.getElementById('actFee').innerText = fee;
     document.getElementById('actPrefTime').innerText = prefTime;
     document.getElementById('actPrefBudget').innerText = prefBudg;
 
@@ -432,14 +427,29 @@ window.loadActive = function(id, o) {
         const d = new Date(o.timestamp);
         orderTime = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
-    document.getElementById('actOrderTime').innerText = orderTime;
+    // Fixed: Ensure this element exists before setting, although in new HTML it does.
+    const timeEl = document.getElementById('actOrderTime');
+    if(timeEl) timeEl.innerText = orderTime;
 
+    // --- ITEM LIST WITH PRICE ---
     const ul = document.getElementById('actItems');
-    ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => `
-        <li class="flex justify-between border-b border-gray-100 pb-1 last:border-0">
-            <span>${i.name}</span><span class="text-gray-900 font-bold">${i.qty} x${i.count}</span>
-        </li>
-    `).join('') : '';
+    if(ul) {
+        ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
+            // Calculate Item Price
+            const price = parseFloat(i.price) || 0;
+            const count = parseInt(i.count) || 1;
+            const totalItemPrice = price * count;
+
+            return `
+            <li class="flex justify-between border-b border-gray-100 pb-1 last:border-0">
+                <div>
+                    <span class="text-gray-800">${i.name}</span>
+                    <span class="text-[10px] text-gray-500 block">₹${price} x ${count}</span>
+                </div>
+                <span class="text-gray-900 font-bold">₹${totalItemPrice}</span>
+            </li>
+        `}).join('') : '';
+    }
 
     const weight = window.calculateOrderWeight ? window.calculateOrderWeight(o.cart) : 0;
     let specialReqHTML = '';
@@ -453,16 +463,29 @@ window.loadActive = function(id, o) {
         }
     });
 
-    document.getElementById('actExtraDetails').innerHTML = `
-        <div class="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200 mt-2">
-            <span class="text-[10px] text-gray-400 font-bold uppercase">Total Weight</span>
-            <span class="text-sm font-bold text-gray-800"><i class="fa-solid fa-weight-hanging text-gray-500 mr-1"></i>${weight} KG</span>
-        </div>
-        ${specialReqHTML}
-    `;
-    
+    const extraEl = document.getElementById('actExtraDetails');
+    if(extraEl) {
+        extraEl.innerHTML = `
+            <div class="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-200 mt-2">
+                <span class="text-[10px] text-gray-400 font-bold uppercase">Total Weight</span>
+                <span class="text-sm font-bold text-gray-800"><i class="fa-solid fa-weight-hanging text-gray-500 mr-1"></i>${weight} KG</span>
+            </div>
+            ${specialReqHTML}
+        `;
+    }
+
+    // --- BILL SUMMARY INJECTION ---
+    const pay = o.payment || {};
+    const billItem = document.getElementById('billItemTotal');
+    const billFee = document.getElementById('billDeliveryFee');
+    const billGrand = document.getElementById('billGrandTotal');
+
+    if(billItem) billItem.innerText = pay.itemTotal || 0;
+    if(billFee) billFee.innerText = pay.deliveryFee || 0;
+    if(billGrand) billGrand.innerText = pay.grandTotal || 0;
+
     updateActiveDistance();
-    
+
     // --- OPEN MAP & WIDGETS ---
     if(window.toggleLiveMap) window.toggleLiveMap(true); 
     if(window.renderActiveWholesalerWidget) window.renderActiveWholesalerWidget();
@@ -494,7 +517,7 @@ function updateBtnUI(status) {
 
 window.updateStatus = function(st) {
     if(st === 'delivered' && !confirm("Confirm Cash Collected?")) return;
-    
+
     const updates = { status: st };
     if (st === 'out_for_delivery') updates.pickupLocation = { lat: window.myLat, lng: window.myLng };
 
@@ -506,12 +529,12 @@ window.updateStatus = function(st) {
             }
         }
     }
-    
+
     window.db.ref('orders/'+window.activeOrder.id).update(updates).then(() => {
         if(st === 'delivered') {
             if(window.triggerCelebration) window.triggerCelebration();
             showToast("Order Completed! Great Job!");
-            
+
             window.db.ref('deliveryBoys/'+window.session.mobile+'/earnings').transaction(current => (current || 0) + PARTNER_PAY);
             window.db.ref('deliveryBoys/'+window.session.mobile+'/trips').transaction(current => (current || 0) + 1);
             window.db.ref('deliveryBoys/'+window.session.mobile+'/lifetimeEarnings').transaction(current => (current || 0) + PARTNER_PAY);
@@ -528,4 +551,3 @@ window.updateStatus = function(st) {
 window.changeStatus = function() {
     if(window.activeOrder) updateBtnUI(window.activeOrder.status);
 }
-
