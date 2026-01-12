@@ -8,7 +8,7 @@ import { toggleMenu, showToast } from '../utils.js';
 import { HomeActions } from './home-actions.js'; // Logic Import
 
 export const HomeModule = {
-    // 1. HTML TEMPLATE (View) - EXACT COPY OF delivery-home.html
+    // 1. HTML TEMPLATE (View) - Exact Copy of delivery-home.html structure
     render: () => {
         const user = state.user || {};
         return `
@@ -47,6 +47,7 @@ export const HomeModule = {
                 </div>
                 <h2 class="font-bold text-lg text-gray-900">${user.name}</h2>
                 <p class="text-xs text-gray-500 font-mono">+91 ${user.mobile}</p>
+                <!-- Star Ratings -->
                 <div class="mt-2 flex gap-1 justify-center">
                     <i class="fa-solid fa-star text-amber-400 text-xs"></i>
                     <i class="fa-solid fa-star text-amber-400 text-xs"></i>
@@ -75,10 +76,10 @@ export const HomeModule = {
             </nav>
         </div>
 
-        <!-- MAIN CONTENT -->
+        <!-- MAIN CONTENT AREA -->
         <div class="px-4 mt-20 pb-24">
 
-            <!-- WHOLESALER STRIP -->
+            <!-- Wholesaler Strip (Horizontal Scroll) -->
             <div id="wholesalerStrip" class="hidden mb-4">
                 <div class="flex justify-between items-end mb-2 px-1">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-shop text-amber-600 mr-1"></i> Nearby Wholesalers</h3>
@@ -87,7 +88,7 @@ export const HomeModule = {
                 <div id="wsListContainer" class="flex gap-3 overflow-x-auto no-scrollbar pb-2 snap-x w-full"></div>
             </div>
 
-            <!-- RADIUS CONTROL -->
+            <!-- Radius Control -->
             <div id="radiusControl" class="hidden bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4">
                 <div class="flex justify-between items-center mb-2">
                     <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-crosshairs text-amber-600 mr-1"></i> Scanning Range</h3>
@@ -97,7 +98,7 @@ export const HomeModule = {
                 <p class="text-[10px] text-gray-400 mt-1 text-center font-medium">Showing orders within this circle.</p>
             </div>
 
-            <!-- STATS SECTION -->
+            <!-- Dashboard Stats Grid -->
             <div id="statsSection" class="hidden grid grid-cols-2 gap-3 mb-6">
                 <div class="bg-white rounded-xl p-3 border border-gray-200 flex flex-col items-center shadow-sm">
                     <span class="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Earnings</span>
@@ -109,7 +110,7 @@ export const HomeModule = {
                 </div>
             </div>
 
-            <!-- STATES -->
+            <!-- Empty/Offline States -->
             <div id="offlineState" class="flex flex-col items-center justify-center py-12 text-center">
                 <div class="w-20 h-20 bg-gray-200 rounded-full flex items-center justify-center mb-4 text-gray-400 shadow-inner"><i class="fa-solid fa-power-off text-3xl"></i></div>
                 <h2 class="text-lg font-bold text-gray-700">You are Offline</h2>
@@ -125,6 +126,7 @@ export const HomeModule = {
                 <p class="text-xs text-gray-500 mt-4 bg-white border border-gray-200 px-3 py-1 rounded-full shadow-sm"><i class="fa-solid fa-location-dot mr-1 text-blue-500"></i> <span id="locStatus">GPS Waiting...</span></p>
             </div>
 
+            <!-- Orders List (Visible when Online) -->
             <div id="ordersContainer" class="hidden space-y-4 pb-20">
                 <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex justify-between">
                     <span>Nearby Tasks</span>
@@ -133,15 +135,25 @@ export const HomeModule = {
                 <div id="ordersList" class="space-y-4"></div>
             </div>
 
-            <!-- ACTIVE ORDER PANEL (Restored Design) -->
+            <!-- ACTIVE ORDER PANEL (Detailed View) -->
             <div id="activeOrderPanel" class="hidden fixed inset-0 z-50 bg-gray-50 flex flex-col animate-[slideUp_0.3s_ease-out]">
-                <div class="bg-white p-4 border-b border-gray-200 flex justify-between items-center shadow-sm">
-                    <h2 class="font-bold text-amber-600">Live Task</h2>
-                    <span class="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded uppercase font-bold" id="activeStatus">Processing</span>
+
+                <!-- 1. Header with Status & Order ID -->
+                <div class="bg-white p-4 border-b border-gray-200 shadow-sm">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="font-bold text-amber-600 text-lg flex items-center gap-2"><i class="fa-solid fa-bolt"></i> Live Task</h2>
+                        <span class="text-xs bg-amber-100 text-amber-700 border border-amber-200 px-2 py-1 rounded uppercase font-bold" id="activeStatus">Processing</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-gray-500 font-medium">
+                        <span id="actOrderId">#ORD-....</span>
+                        <span id="actOrderDate">--/--/----</span>
+                    </div>
                 </div>
 
+                <!-- 2. Scrollable Content -->
                 <div class="flex-1 overflow-y-auto p-4 space-y-4">
-                    <!-- Live Map & Dashboard -->
+
+                    <!-- Live Map Section -->
                     <div id="liveMapSection" class="hidden animate-[fadeIn_0.5s_ease-out]">
                         <div class="flex justify-between items-end mb-2">
                             <h3 class="text-xs font-bold text-gray-500 uppercase tracking-widest"><i class="fa-solid fa-map text-blue-500 mr-1"></i> Smart Route</h3>
@@ -149,21 +161,18 @@ export const HomeModule = {
                                 <i class="fa-solid fa-location-crosshairs"></i> Recenter
                             </button>
                         </div>
-                        <div class="map-container shadow-md bg-white">
-                            <div id="deliveryMap"></div>
+                        <div class="map-container shadow-md bg-white relative rounded-xl overflow-hidden h-48">
+                            <div id="deliveryMap" class="h-full w-full"></div>
                             <div id="mapLoader" class="absolute inset-0 bg-gray-50/90 flex flex-col items-center justify-center z-[1000]">
                                 <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500 mb-2"></i>
                                 <span class="text-gray-600 text-xs font-bold">Connecting GPS...</span>
                             </div>
                         </div>
 
-                        <!-- Smart Dashboard (Carousel) -->
+                        <!-- Smart Dashboard (Wholesaler & Time) -->
                         <div id="smartDashboard" class="flex gap-2 mt-3 h-20">
                             <div class="w-[75%] bg-white rounded-xl border border-gray-200 p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-center">
                                 <div id="activeWholesalerCard"><p class="text-[10px] text-gray-400 text-center">Loading Shops...</p></div>
-                                <button id="btnNextShop" class="absolute right-0 top-0 bottom-0 w-6 bg-gray-100 hover:bg-gray-200 border-l border-gray-200 flex items-center justify-center text-gray-500 transition hidden">
-                                    <i class="fa-solid fa-chevron-right text-[10px]"></i>
-                                </button>
                             </div>
                             <div class="w-[25%] bg-blue-50 rounded-xl border border-blue-100 p-2 shadow-sm flex flex-col items-center justify-center text-center">
                                 <p class="text-[9px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">Time</p>
@@ -173,18 +182,31 @@ export const HomeModule = {
                         </div>
                     </div>
 
+                    <!-- Pickup Point -->
                     <div class="relative pl-6 border-l-2 border-gray-200 ml-1">
                         <span class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-sm"></span>
-                        <h3 class="text-xs font-bold text-gray-400 uppercase">Partner (You)</h3>
-                        <p class="text-lg font-bold text-gray-900 mt-0.5" id="actShop">You</p>
-                        <p class="text-xs text-green-600 font-bold flex items-center gap-1" id="actShopLoc"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Live Tracking Active</p>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase">Pickup From</h3>
+                        <p class="text-lg font-bold text-gray-900 mt-0.5" id="actShop">Store Name</p>
+                        <p class="text-xs text-green-600 font-bold flex items-center gap-1" id="actShopLoc">
+                            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span> Calculating...
+                        </p>
+                        <div class="mt-2">
+                            <button id="callShopBtn" class="text-[10px] bg-gray-100 border border-gray-200 px-3 py-1.5 rounded-lg font-bold text-gray-600 flex items-center gap-2 hover:bg-gray-200" onclick="window.callShop()">
+                                <i class="fa-solid fa-phone"></i> Call Shop
+                            </button>
+                        </div>
                     </div>
 
+                    <!-- Items List -->
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 pb-2">Order Items</h4>
+                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 pb-2 flex justify-between">
+                            <span>Order Items</span>
+                            <span class="text-gray-300"><i class="fa-solid fa-box-open"></i></span>
+                        </h4>
                         <ul id="actItems" class="text-sm text-gray-700 space-y-2 font-medium"></ul>
                     </div>
 
+                    <!-- Trip Details -->
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <h4 class="text-xs font-bold text-gray-400 uppercase mb-3 border-b border-gray-100 pb-2">Trip & Preferences</h4>
                         <div class="grid grid-cols-2 gap-3">
@@ -196,24 +218,40 @@ export const HomeModule = {
                         <div id="actExtraDetails" class="mt-3 space-y-2"></div>
                     </div>
 
+                    <!-- Drop Point & Customer -->
                     <div class="relative pl-6 border-l-2 border-gray-200 ml-1">
                         <span class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-green-500 border-2 border-white shadow-sm"></span>
                         <h3 class="text-xs font-bold text-gray-400 uppercase">Deliver To</h3>
                         <p class="text-lg font-bold text-gray-900 mt-0.5" id="actCust">Customer Name</p>
-                        <p class="text-sm text-gray-500" id="actAddr">Address</p>
+                        <p class="text-sm text-gray-500 leading-tight" id="actAddr">Address</p>
+
                         <div class="flex gap-2 mt-3">
-                            <button id="navBtn" class="flex-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-2.5 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition flex items-center justify-center gap-2 shadow-sm"><i class="fa-solid fa-location-arrow"></i> Navigate</button>
-                            <button id="waBtn" class="bg-green-50 text-green-600 border border-green-200 px-3 py-2.5 rounded-lg text-xs hover:bg-green-600 hover:text-white shadow-sm transition"><i class="fa-brands fa-whatsapp text-lg"></i></button>
-                            <button id="callBtn" class="bg-gray-100 border border-gray-200 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-200 shadow-sm transition"><i class="fa-solid fa-phone text-lg"></i></button>
+                            <button id="navBtn" class="flex-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-2.5 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fa-solid fa-location-arrow"></i> Navigate
+                            </button>
+                            <button id="waBtn" class="bg-green-50 text-green-600 border border-green-200 px-3 py-2.5 rounded-lg text-xs hover:bg-green-600 hover:text-white shadow-sm transition">
+                                <i class="fa-brands fa-whatsapp text-lg"></i>
+                            </button>
+                            <button id="callBtn" class="bg-gray-100 border border-gray-200 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-200 shadow-sm transition">
+                                <i class="fa-solid fa-phone text-lg"></i>
+                            </button>
                         </div>
                     </div>
 
-                    <div class="bg-white p-4 rounded-xl flex justify-between items-center border border-gray-200 shadow-sm">
-                        <span class="text-sm text-gray-500 font-bold">Total Bill (Collect Cash)</span>
-                        <span class="text-2xl font-bold text-gray-900">₹<span id="actFee">0</span></span>
+                    <!-- Bill Summary -->
+                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="text-sm text-gray-500 font-bold">Collect Cash (Bill)</span>
+                            <span class="text-2xl font-bold text-gray-900">₹<span id="actFee">0</span></span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs border-t border-gray-100 pt-2 mt-2">
+                            <span class="text-gray-400 font-medium">Payment Mode</span>
+                            <span class="font-bold text-slate-700 uppercase bg-slate-100 px-2 py-0.5 rounded" id="actPayMode">COD</span>
+                        </div>
                     </div>
                 </div>
 
+                <!-- Action Button Footer -->
                 <div class="p-5 bg-white border-t border-gray-200 shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                     <button id="actionBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 active:scale-95 transition">UPDATE STATUS</button>
                 </div>
