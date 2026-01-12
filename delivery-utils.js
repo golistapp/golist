@@ -108,7 +108,7 @@ window.updateMapVisuals = function() {
     if(!deliveryMap || !deliveryLayerGroup) return;
 
     deliveryLayerGroup.clearLayers();
-    
+
     // Clear old route if exists
     if(routeControl) {
         try { deliveryMap.removeControl(routeControl); } catch(e) {}
@@ -145,7 +145,7 @@ window.updateMapVisuals = function() {
         L.marker([custLat, custLng], {icon: custIcon})
             .bindPopup(`<b style="color:#111827">Customer</b>`)
             .addTo(deliveryLayerGroup);
-        
+
         // DRAW ROUTE (Turn-by-Turn)
         if(window.myLat && window.myLng) {
             drawRoute(window.myLat, window.myLng, custLat, custLng);
@@ -153,11 +153,13 @@ window.updateMapVisuals = function() {
     }
 
     // 3. WHOLESALER MARKERS (With Distance Popup)
-    if(window.approvedWholesalers && window.approvedWholesalers.length > 0) {
+    // CONDITIONAL: Only show if toggle is ON and distance is within serviceRadius
+    if(window.showShopsOnMap && window.approvedWholesalers && window.approvedWholesalers.length > 0) {
         window.approvedWholesalers.forEach(ws => {
             if(ws.location && ws.location.lat) {
-                const dist = getDistance(window.myLat, window.myLng, ws.location.lat, ws.location.lng);
-                if(dist <= 5) { 
+                const dist = parseFloat(getDistance(window.myLat, window.myLng, ws.location.lat, ws.location.lng));
+                // Filter by Radius
+                if(dist <= parseFloat(window.serviceRadius || 5)) { 
                     const shopIcon = L.divIcon({
                         className: 'custom-div-icon',
                         html: `<div style="background-color:#f59e0b; width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; border: 1px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -166,7 +168,7 @@ window.updateMapVisuals = function() {
                         iconSize: [24, 24],
                         iconAnchor: [12, 12]
                     });
-                    
+
                     L.marker([ws.location.lat, ws.location.lng], {icon: shopIcon})
                         .bindPopup(`
                             <div class="text-center p-1">
@@ -192,7 +194,8 @@ function drawRoute(startLat, startLng, endLat, endLng) {
             L.latLng(endLat, endLng)
         ],
         lineOptions: {
-            styles: [{color: '#3b82f6', opacity: 0.8, weight: 6}]
+            // UPDATED: Added className 'blink-route' for blinking effect
+            styles: [{color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route'}]
         },
         createMarker: function() { return null; }, // We use our own markers
         addWaypoints: false,
@@ -203,17 +206,17 @@ function drawRoute(startLat, startLng, endLat, endLng) {
     }).on('routesfound', function(e) {
         const routes = e.routes;
         const summary = routes[0].summary;
-        
+
         // Update Dashboard with Real Road Data
         const distKm = (summary.totalDistance / 1000).toFixed(1);
         const timeMin = Math.round(summary.totalTime / 60);
-        
+
         const timeBox = document.getElementById('liveTimeBox');
         const distBox = document.getElementById('liveDistBox');
-        
+
         if(timeBox) timeBox.innerText = timeMin + " min";
         if(distBox) distBox.innerText = distKm + " KM";
-        
+
     }).addTo(deliveryMap);
 }
 
@@ -225,7 +228,7 @@ let nearbyShopsCache = [];
 window.renderActiveWholesalerWidget = function() {
     const container = document.getElementById('activeWholesalerCard');
     const nextBtn = document.getElementById('btnNextShop');
-    
+
     if(!container) return;
 
     // Filter Nearby Shops
@@ -261,10 +264,11 @@ function renderSingleShopCard(shop) {
     const container = document.getElementById('activeWholesalerCard');
     if(!container) return;
 
+    // UPDATED: Fixed layout to prevent right-side clipping of distance badge
     container.innerHTML = `
-        <div class="flex justify-between items-start mb-1">
-            <h4 class="font-bold text-gray-800 text-xs truncate w-[85%]" title="${shop.shopName}">${shop.shopName}</h4>
-            <span class="text-[9px] bg-amber-100 text-amber-700 px-1 rounded font-bold">${shop.dist}KM</span>
+        <div class="flex justify-between items-center mb-1 gap-2">
+            <h4 class="font-bold text-gray-800 text-xs truncate flex-1" title="${shop.shopName}">${shop.shopName}</h4>
+            <span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold flex-shrink-0 whitespace-nowrap">${shop.dist}KM</span>
         </div>
         <p class="text-[9px] text-gray-500 truncate mb-1"><i class="fa-solid fa-map-pin mr-1"></i>${shop.address}</p>
         <div class="flex gap-1.5 mt-auto">
@@ -283,7 +287,7 @@ window.updateDashboardDistance = function() {
 
     const distBox = document.getElementById('liveDistBox');
     if(!distBox || !window.activeOrder || !window.activeOrder.location) return;
-    
+
     const d = getDistance(window.myLat, window.myLng, window.activeOrder.location.lat, window.activeOrder.location.lng);
     distBox.innerText = d + " KM";
     if(timeBox) timeBox.innerText = Math.ceil(d * 3) + " min"; // Rough estimate
@@ -328,7 +332,7 @@ window.openMap = function(type) {
     if(!window.activeOrder || !window.activeOrder.location) return;
     const lat = window.activeOrder.location.lat;
     const lng = window.activeOrder.location.lng;
-    
+
     if(type === 'dir') window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
     else if (type === 'view') window.open(`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`, '_blank');
 }
@@ -349,7 +353,7 @@ window.updateWholesalerDisplay = function() {
     const strip = document.getElementById('wholesalerStrip');
     const container = document.getElementById('wsListContainer');
     if(!strip || !container) return;
-    
+
     if(!window.approvedWholesalers || !window.approvedWholesalers.length || !window.isOnline) {
         strip.classList.add('hidden');
         return;
@@ -425,7 +429,7 @@ window.resetWsForm = function() {
 window.connectWholesalerLocation = function() {
     const btn = document.getElementById('btnConnectLoc');
     btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Detecting...';
-    
+
     if(!navigator.geolocation) {
         alert("GPS not supported");
         btn.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> GPS Failed';
@@ -437,11 +441,11 @@ window.connectWholesalerLocation = function() {
         const lng = pos.coords.longitude;
         document.getElementById('wsLat').value = lat;
         document.getElementById('wsLng').value = lng;
-        
+
         btn.innerHTML = '<i class="fa-solid fa-check"></i> Location Connected';
         btn.classList.replace('bg-blue-50', 'bg-green-50');
         btn.classList.replace('text-blue-600', 'text-green-600');
-        
+
         document.getElementById('wsAddress').value = "Fetching address details...";
         try {
             const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
@@ -490,7 +494,7 @@ window.loadMyWholesalerRequests = function() {
     if(!list) return;
     list.innerHTML = '<p class="text-center text-gray-500 text-xs py-2"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</p>';
     if (window.myWholesalerQuery) window.myWholesalerQuery.off();
-    
+
     window.myWholesalerQuery = window.db.ref('wholesalerRequests').orderByChild('partnerMobile').equalTo(String(window.session.mobile));
     window.myWholesalerQuery.on('value', snap => {
         list.innerHTML = '';
@@ -503,7 +507,7 @@ window.loadMyWholesalerRequests = function() {
                 let statusBadge = req.status === 'approved' ? `<span class="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded border border-green-200 uppercase font-bold"><i class="fa-solid fa-check-circle mr-1"></i> Verified</span>` : 
                                  (req.status === 'pending' ? `<span class="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded border border-amber-200 uppercase font-bold">Pending</span>` : 
                                  `<span class="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded border border-red-200 uppercase font-bold">Disabled</span>`);
-                
+
                 let actions = req.status === 'pending' ? `
                     <div class="flex gap-2 mt-2">
                         <button onclick="editWsRequest('${req.key}', '${req.shopName}', '${req.ownerMobile}', '${req.address}', ${req.location.lat}, ${req.location.lng})" class="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded text-gray-700 flex-1 font-bold">Edit</button>

@@ -48,6 +48,17 @@
             100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } 
         }
         
+        /* Blinking Route Animation */
+        .blink-route { animation: route-pulse 1.5s infinite alternate; }
+        @keyframes route-pulse {
+            0% { opacity: 0.6; stroke-width: 6px; }
+            100% { opacity: 1; stroke-width: 9px; }
+        }
+
+        /* Rotation Animation for Refresh */
+        .spin-anim { animation: spin 1s linear infinite; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        
         /* Range Slider */
         input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
         input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #f59e0b; cursor: pointer; margin-top: -8px; box-shadow: 0 2px 6px rgba(245,158,11,0.4); border: 2px solid white; }
@@ -201,8 +212,20 @@
                             <i class="fa-solid fa-location-crosshairs"></i> Recenter
                         </button>
                     </div>
-                    <div class="map-container shadow-md bg-white">
+                    <div class="map-container shadow-md bg-white relative">
                         <div id="deliveryMap"></div>
+                        
+                        <!-- MAP CONTROLS (NEW) -->
+                        <div class="absolute top-3 right-3 z-[400] flex flex-col gap-2">
+                            <button onclick="refreshMapData()" class="w-10 h-10 bg-white rounded-xl shadow-md border border-gray-200 text-gray-600 flex items-center justify-center hover:text-blue-600 transition active:scale-95">
+                                <i class="fa-solid fa-sync-alt" id="refreshIcon"></i>
+                            </button>
+                            <button onclick="toggleShopMarkers()" id="btnToggleShops" class="w-10 h-10 bg-white rounded-xl shadow-md border border-gray-200 text-gray-400 flex items-center justify-center hover:text-amber-600 transition active:scale-95 relative">
+                                <i class="fa-solid fa-store"></i>
+                                <span class="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full hidden" id="shopIndicator"></span>
+                            </button>
+                        </div>
+
                         <div id="mapLoader" class="absolute inset-0 bg-gray-50/90 flex flex-col items-center justify-center z-[1000]">
                             <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500 mb-2"></i>
                             <span class="text-gray-600 text-xs font-bold">Connecting GPS...</span>
@@ -211,11 +234,11 @@
 
                     <!-- SMART DASHBOARD (Wholesaler + Distance) -->
                     <div id="smartDashboard" class="flex gap-2 mt-3 h-20">
-                        <div class="w-[75%] bg-white rounded-xl border border-gray-200 p-2.5 shadow-sm relative overflow-hidden flex flex-col justify-center">
-                            <div id="activeWholesalerCard">
+                        <div class="w-[75%] bg-white rounded-xl border border-gray-200 p-2 shadow-sm relative overflow-hidden flex flex-col justify-center">
+                            <div id="activeWholesalerCard" class="pr-6"> <!-- Added padding right -->
                                 <p class="text-[10px] text-gray-400 text-center">Loading Shops...</p>
                             </div>
-                            <button id="btnNextShop" class="absolute right-0 top-0 bottom-0 w-6 bg-gray-100 hover:bg-gray-200 border-l border-gray-200 flex items-center justify-center text-gray-500 transition hidden">
+                            <button id="btnNextShop" class="absolute right-0 top-0 bottom-0 w-8 bg-gray-100 hover:bg-gray-200 border-l border-gray-200 flex items-center justify-center text-gray-500 transition hidden">
                                 <i class="fa-solid fa-chevron-right text-[10px]"></i>
                             </button>
                         </div>

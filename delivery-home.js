@@ -34,6 +34,9 @@ window.approvedWholesalers = []; // Store list for utils to display
 window.myWholesalerQuery = null;
 window.isMapOpen = false;
 
+// NEW: Control Flags for Map
+window.showShopsOnMap = false; 
+
 // SMART GPS VARIABLES
 let lastSentLat = 0;
 let lastSentLng = 0;
@@ -42,8 +45,9 @@ const GPS_UPDATE_THRESHOLD_KM = 0.03; // 30 Meters
 let watchId, heartbeatInterval;
 const PARTNER_PAY = 20;
 
-let serviceRadius = localStorage.getItem('rmz_pref_radius') || 5;
-if(serviceRadius > 10) serviceRadius = 10;
+// UPDATED: Make serviceRadius global so we can access it in utils
+window.serviceRadius = localStorage.getItem('rmz_pref_radius') || 5;
+if(window.serviceRadius > 10) window.serviceRadius = 10;
 
 // --- INITIALIZATION ---
 window.onload = () => {
@@ -64,9 +68,9 @@ window.onload = () => {
     if(els.menuName) els.menuName.innerText = window.session.name;
     if(els.menuMobile) els.menuMobile.innerText = '+91 ' + window.session.mobile;
 
-    if(els.radiusSlider) els.radiusSlider.value = serviceRadius;
-    if(els.radiusVal) els.radiusVal.innerText = serviceRadius;
-    if(els.scanKm) els.scanKm.innerText = serviceRadius;
+    if(els.radiusSlider) els.radiusSlider.value = window.serviceRadius;
+    if(els.radiusVal) els.radiusVal.innerText = window.serviceRadius;
+    if(els.scanKm) els.scanKm.innerText = window.serviceRadius;
 
     // 2. Check Account Status
     window.db.ref('deliveryBoys/' + window.session.mobile + '/status').on('value', snap => {
@@ -127,11 +131,16 @@ window.toggleDuty = function() {
 }
 
 window.updateRadius = function(val) {
-    serviceRadius = val;
+    window.serviceRadius = val;
     localStorage.setItem('rmz_pref_radius', val);
     document.getElementById('radiusVal').innerText = val;
     document.getElementById('scanKm').innerText = val;
     listenOrders(); // Refresh orders with new radius
+
+    // Also refresh map markers if shops are visible
+    if(window.isMapOpen && window.showShopsOnMap && window.updateMapVisuals) {
+        window.updateMapVisuals();
+    }
 }
 
 // --- GPS & HEARTBEAT ---
@@ -236,6 +245,8 @@ function fetchApprovedWholesalersList() {
         }
         if(window.updateWholesalerDisplay) window.updateWholesalerDisplay(); 
         if(window.renderActiveWholesalerWidget) window.renderActiveWholesalerWidget();
+        // If map is open and markers are enabled, update them
+        if(window.isMapOpen && window.showShopsOnMap && window.updateMapVisuals) window.updateMapVisuals();
     });
 }
 
@@ -252,7 +263,7 @@ window.listenOrders = function() {
         if(snap.exists()) {
             Object.entries(snap.val()).forEach(([id, o]) => {
                 const dist = parseFloat(window.getDistance(window.myLat, window.myLng, o.location.lat, o.location.lng));
-                const isInRange = dist <= parseFloat(serviceRadius);
+                const isInRange = dist <= parseFloat(window.serviceRadius);
                 const isMyOrder = (o.status === 'accepted' && o.deliveryBoyId === window.session.mobile);
 
                 if((o.status === 'placed' && isInRange) || isMyOrder) {
@@ -260,7 +271,6 @@ window.listenOrders = function() {
                     const shopName = o.user && o.user.shopName ? o.user.shopName : "Unknown Shop";
                     const address = o.location && o.location.address ? o.location.address : "Address Hidden";
 
-                    // UPDATED: Show Grand Total (Cash to Collect) on Homepage Card instead of just Fee
                     const grandTotal = o.payment && o.payment.grandTotal ? o.payment.grandTotal : 0;
 
                     const prefTime = o.preferences && o.preferences.deliveryTime ? o.preferences.deliveryTime : "Standard";
@@ -302,7 +312,6 @@ window.listenOrders = function() {
                     const bgClass = (window.activeOrder && window.activeOrder.id === id) ? 'bg-blue-600 hover:bg-blue-500' : (window.activeOrder ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-500');
                     const clickAction = (window.activeOrder && window.activeOrder.id === id) ? `loadActive('${id}', ${safeOrder})` : `acceptOrder('${id}')`;
 
-                    // UPDATED: Display Cash: ₹{grandTotal}
                     div.innerHTML = `
                         <div class="flex justify-between items-start mb-2">
                             <h4 class="font-bold text-gray-900 text-lg">${shopName}</h4>
@@ -434,16 +443,12 @@ window.loadActive = function(id, o) {
     const timeEl = document.getElementById('actOrderTime');
     if(timeEl) timeEl.innerText = orderTime;
 
-    // --- UPDATED ITEM LIST WITH QTY x COUNT ---
     const ul = document.getElementById('actItems');
     if(ul) {
         ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
-            // Calculate Item Price
             const price = parseFloat(i.price) || 0;
             const count = parseInt(i.count) || 1;
             const totalItemPrice = price * count;
-
-            // UPDATED: Quantity Format: "500gm x 2"
             const quantityText = i.qty ? `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">${i.qty} x ${count}</span>` : `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">x ${count}</span>`;
 
             return `
@@ -561,4 +566,51 @@ window.changeStatus = function() {
     if(window.activeOrder) updateBtnUI(window.activeOrder.status);
 }
 
+// --- NEW MAP FUNCTIONS ---
 
+// 1. Refresh Button Logic
+window.refreshMapData = function() {
+    const icon = document.getElementById('refreshIcon');
+    if(icon) icon.classList.add('spin-anim'); // Animation class added in HTML
+
+    if(navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+            window.myLat = pos.coords.latitude;
+            window.myLng = pos.coords.longitude;
+
+            // Re-center if map function exists
+            if(window.recenterMap) window.recenterMap();
+
+            // Update Visuals if enabled
+            if(window.updateMapVisuals) window.updateMapVisuals();
+
+            // Stop Animation after delay
+            setTimeout(() => {
+                if(icon) icon.classList.remove('spin-anim');
+                showToast("GPS Synced & Refreshed");
+            }, 1000);
+        }, err => {
+            if(icon) icon.classList.remove('spin-anim');
+            showToast("GPS Error: " + err.message);
+        }, {enableHighAccuracy: true});
+    }
+}
+
+// 2. Shop Toggle Logic
+window.toggleShopMarkers = function() {
+    window.showShopsOnMap = !window.showShopsOnMap;
+    const btn = document.getElementById('btnToggleShops');
+    const ind = document.getElementById('shopIndicator');
+
+    if(window.showShopsOnMap) {
+        if(btn) btn.classList.replace('text-gray-400', 'text-amber-600');
+        if(ind) ind.classList.remove('hidden');
+        showToast(`Showing Shops in ${window.serviceRadius}KM`);
+    } else {
+        if(btn) btn.classList.replace('text-amber-600', 'text-gray-400');
+        if(ind) ind.classList.add('hidden');
+        showToast("Shops Hidden");
+    }
+
+    if(window.updateMapVisuals) window.updateMapVisuals();
+}
