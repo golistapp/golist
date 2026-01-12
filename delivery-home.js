@@ -259,7 +259,10 @@ window.listenOrders = function() {
                     count++;
                     const shopName = o.user && o.user.shopName ? o.user.shopName : "Unknown Shop";
                     const address = o.location && o.location.address ? o.location.address : "Address Hidden";
-                    const fee = o.payment && o.payment.deliveryFee ? o.payment.deliveryFee : 0;
+
+                    // UPDATED: Show Grand Total (Cash to Collect) on Homepage Card instead of just Fee
+                    const grandTotal = o.payment && o.payment.grandTotal ? o.payment.grandTotal : 0;
+
                     const prefTime = o.preferences && o.preferences.deliveryTime ? o.preferences.deliveryTime : "Standard";
                     const prefBudg = o.preferences && o.preferences.budget ? o.preferences.budget : "Standard";
 
@@ -299,10 +302,11 @@ window.listenOrders = function() {
                     const bgClass = (window.activeOrder && window.activeOrder.id === id) ? 'bg-blue-600 hover:bg-blue-500' : (window.activeOrder ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-500');
                     const clickAction = (window.activeOrder && window.activeOrder.id === id) ? `loadActive('${id}', ${safeOrder})` : `acceptOrder('${id}')`;
 
+                    // UPDATED: Display Cash: ₹{grandTotal}
                     div.innerHTML = `
                         <div class="flex justify-between items-start mb-2">
                             <h4 class="font-bold text-gray-900 text-lg">${shopName}</h4>
-                            <span class="bg-green-100 text-green-700 border border-green-200 text-xs font-bold px-2 py-1 rounded">₹${fee}</span>
+                            <span class="bg-gray-800 text-white border border-gray-900 text-xs font-bold px-3 py-1 rounded">₹${grandTotal}</span>
                         </div>
                         <div class="text-xs text-gray-500 space-y-1 mb-3">
                             <p class="truncate"><i class="fa-solid fa-box mr-1"></i> ${prodTxt}</p>
@@ -427,11 +431,10 @@ window.loadActive = function(id, o) {
         const d = new Date(o.timestamp);
         orderTime = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
-    // Fixed: Ensure this element exists before setting, although in new HTML it does.
     const timeEl = document.getElementById('actOrderTime');
     if(timeEl) timeEl.innerText = orderTime;
 
-    // --- ITEM LIST WITH PRICE & QTY (FIXED) ---
+    // --- UPDATED ITEM LIST WITH QTY x COUNT ---
     const ul = document.getElementById('actItems');
     if(ul) {
         ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
@@ -440,8 +443,8 @@ window.loadActive = function(id, o) {
             const count = parseInt(i.count) || 1;
             const totalItemPrice = price * count;
 
-            // i.qty ko check karo aur use karo
-            const quantityText = i.qty ? `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">${i.qty}</span>` : '';
+            // UPDATED: Quantity Format: "500gm x 2"
+            const quantityText = i.qty ? `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">${i.qty} x ${count}</span>` : `<span class="bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded text-[10px] font-bold ml-1">x ${count}</span>`;
 
             return `
             <li class="flex justify-between border-b border-gray-100 pb-1 last:border-0 items-center">
