@@ -1,5 +1,5 @@
 // ==========================================
-// MAP, ROUTING & VISUALIZATION MANAGER (FIXED)
+// MAP, ROUTING & VISUALIZATION MANAGER (CRASH PROOF FIX)
 // ==========================================
 
 import { db } from '../config.js';
@@ -9,7 +9,7 @@ import { getDistance, showToast } from '../utils.js';
 let map = null;
 let layerGroup = null;
 let routeControl = null;
-let approvedWholesalers = []; // Local cache for map markers
+let approvedWholesalers = []; 
 let showShopsOnMap = false;
 
 // Wholesaler Widget State
@@ -17,54 +17,72 @@ let currentShopIndex = 0;
 let nearbyShopsCache = [];
 
 export async function initDeliveryMap() {
-    // Safety check: Agar map container nahi hai to ruk jao
-    if (!document.getElementById('deliveryMap')) return;
+    const container = document.getElementById('deliveryMap');
+    if (!container) return; 
 
-    if (map) {
-        map.invalidateSize();
-        return;
+    // 1. Cleanup Old Map
+    if (container._leaflet_id) {
+        container._leaflet_id = null;
+        container.innerHTML = ''; 
+        map = null; 
     }
 
-    console.log("Initializing Leaflet Map...");
-    const loc = getLocation();
-    const startLat = loc.lat || 20.5937; // Default India center if no GPS
-    const startLng = loc.lng || 78.9629;
+    if (map) { map.invalidateSize(); return; }
 
-    // 1. Create Map
+    console.log("Initializing Leaflet Map...");
+
+    // 2. Smart Center Logic
+    // Agar GPS nahi hai (0,0), toh Customer ki location par map kholo
+    const loc = getLocation();
+    const activeOrder = getActiveOrder();
+
+    let startLat = 20.5937; // Default India
+    let startLng = 78.9629;
+
+    if (loc.lat !== 0 && loc.lng !== 0) {
+        startLat = loc.lat;
+        startLng = loc.lng;
+    } else if (activeOrder && activeOrder.location) {
+        // Fallback to Customer Location
+        startLat = activeOrder.location.lat;
+        startLng = activeOrder.location.lng;
+    }
+
     try {
         map = L.map('deliveryMap', { zoomControl: false, attributionControl: false })
                .setView([startLat, startLng], 14);
 
-        // 2. Add Tiles (Light Theme)
         L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
             maxZoom: 19
         }).addTo(map);
 
         layerGroup = L.layerGroup().addTo(map);
 
+        // Loader Hatao
         const loader = document.getElementById('mapLoader');
         if(loader) loader.classList.add('hidden');
 
-        // 3. Setup Controls & Listeners
         setupMapControls();
-        fetchWholesalersForMap(); // Start fetching shops background
+        fetchWholesalersForMap(); 
+        updateMapVisuals();
+
     } catch (e) {
         console.error("Map Init Error:", e);
+        const loader = document.getElementById('mapLoader');
+        if(loader) loader.classList.add('hidden');
     }
 }
 
 function setupMapControls() {
-    // Recenter Button
     const btnRecenter = document.getElementById('btnRecenter');
     if (btnRecenter) {
         btnRecenter.onclick = () => {
             const l = getLocation();
-            if(l.lat && map) map.flyTo([l.lat, l.lng], 16, { animate: true, duration: 1.5 });
-            else showToast("Waiting for GPS...");
+            if(l.lat && l.lat !== 0 && map) map.flyTo([l.lat, l.lng], 16, { animate: true, duration: 1.5 });
+            else showToast("GPS Waiting...");
         };
     }
 
-    // Refresh GPS/Map Button
     const btnRefresh = document.getElementById('btnRefreshMap');
     if (btnRefresh) {
         btnRefresh.onclick = () => {
@@ -73,16 +91,14 @@ function setupMapControls() {
                 icon.classList.add('spin-anim');
                 setTimeout(() => icon.classList.remove('spin-anim'), 1000);
             }
-            updateMapVisuals(); // Force re-render
+            updateMapVisuals(); 
             showToast("Map Synced");
         };
     }
 
-    // Toggle Shops Button
     const btnToggle = document.getElementById('btnToggleShops');
     if (btnToggle) btnToggle.onclick = toggleShopMarkers;
 
-    // Wholesaler Carousel Next Button
     const btnNext = document.getElementById('btnNextShop');
     if (btnNext) {
         btnNext.onclick = () => {
@@ -95,7 +111,7 @@ function setupMapControls() {
 }
 
 // ============================
-// VISUAL UPDATES (Markers)
+// VISUAL UPDATES (CRASH PROOF)
 // ============================
 
 export function updateMapVisuals() {
@@ -105,8 +121,8 @@ export function updateMapVisuals() {
     const loc = getLocation();
     const activeOrder = getActiveOrder();
 
-    // 1. RIDER MARKER (Blue Pulse)
-    if (loc.lat && loc.lng) {
+    // 1. RIDER MARKER (Sirf tab dikhao jab GPS valid ho)
+    if (loc.lat !== 0 && loc.lng !== 0) {
         const riderIcon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div style="background-color:#3b82f6; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:3px solid white; box-shadow:0 0 15px rgba(59,130,246,0.4); animation:pulse-blue 2s infinite;"><i class="fa-solid fa-motorcycle text-white text-sm"></i></div>`,
@@ -125,24 +141,28 @@ export function updateMapVisuals() {
         });
         L.marker([dest.lat, dest.lng], { icon: custIcon }).addTo(layerGroup);
 
-        // Draw Route
-        drawRoute(loc.lat, loc.lng, dest.lat, dest.lng);
+        // ROUTE SAFETY CHECK:
+        // Agar Rider Location 0,0 hai to route mat banao (Error se bacho)
+        if (loc.lat !== 0 && loc.lng !== 0) {
+            drawRoute(loc.lat, loc.lng, dest.lat, dest.lng);
+        } else {
+            console.warn("Skipping Route: Waiting for Rider GPS...");
+            // Map ko customer par center kar do taaki map khali na dikhe
+            map.panTo([dest.lat, dest.lng]);
+        }
     } else {
-        // Clear route if no active order
         if (routeControl) { 
             try { map.removeControl(routeControl); } catch(e){} 
             routeControl = null; 
         }
     }
 
-    // 3. WHOLESALER MARKERS (Orange)
     if (showShopsOnMap) renderWholesalerMarkers(loc);
 }
 
 function drawRoute(startLat, startLng, endLat, endLng) {
     if (routeControl) { try { map.removeControl(routeControl); } catch(e){} }
 
-    // Check if Routing Machine is loaded
     if (!L.Routing) return;
 
     try {
@@ -154,23 +174,26 @@ function drawRoute(startLat, startLng, endLat, endLng) {
             draggableWaypoints: false, 
             fitSelectedRoutes: true, 
             showAlternatives: false,
-            containerClassName: 'hidden-routing-container' // Hides the text instructions box
+            containerClassName: 'hidden-routing-container'
         }).on('routesfound', (e) => {
             const summary = e.routes[0].summary;
-            // Update Dashboard Stats
             const timeBox = document.getElementById('liveTimeBox');
             const distBox = document.getElementById('liveDistBox');
             if (timeBox) timeBox.innerText = Math.round(summary.totalTime / 60) + " min";
             if (distBox) distBox.innerText = (summary.totalDistance / 1000).toFixed(1) + " KM";
-        }).addTo(map);
+        })
+        .on('routingerror', function(e) {
+            console.log('Routing failed (Network/HTTP Error)', e);
+            // Error aane par bhi loader loop mein nahi fasega
+        })
+        .addTo(map);
     } catch(e) {
         console.warn("Routing Error:", e);
     }
 }
 
-// ============================
-// WHOLESALER LOGIC
-// ============================
+// ... Wholesaler functions same as before ...
+// (Niche ka code same rahega, bas changes upar `initDeliveryMap` aur `updateMapVisuals` me hain)
 
 function fetchWholesalersForMap() {
     db.ref('wholesalerRequests').orderByChild('status').equalTo('approved').on('value', snap => {
@@ -178,8 +201,8 @@ function fetchWholesalersForMap() {
         if (snap.exists()) {
             snap.forEach(c => approvedWholesalers.push({ id: c.key, ...c.val() }));
         }
-        updateMapVisuals(); // Refresh markers
-        renderActiveWholesalerWidget(); // Refresh carousel
+        updateMapVisuals();
+        renderActiveWholesalerWidget();
     });
 }
 
@@ -206,7 +229,12 @@ function renderWholesalerMarkers(myLoc) {
     const radius = getRadius();
     approvedWholesalers.forEach(ws => {
         if(!ws.location) return;
-        const dist = parseFloat(getDistance(myLoc.lat, myLoc.lng, ws.location.lat, ws.location.lng));
+        // Handle 0,0 distance gracefully
+        let dist = 9999;
+        if(myLoc.lat !== 0) {
+            dist = parseFloat(getDistance(myLoc.lat, myLoc.lng, ws.location.lat, ws.location.lng));
+        }
+
         if (dist <= radius) {
             const icon = L.divIcon({
                 className: 'custom-div-icon',
@@ -218,10 +246,6 @@ function renderWholesalerMarkers(myLoc) {
     });
 }
 
-// ============================
-// SMART WIDGET (Carousel)
-// ============================
-
 export function renderActiveWholesalerWidget() {
     const container = document.getElementById('activeWholesalerCard');
     const nextBtn = document.getElementById('btnNextShop');
@@ -232,10 +256,11 @@ export function renderActiveWholesalerWidget() {
     // Filter & Sort Nearby
     nearbyShopsCache = approvedWholesalers.map(ws => {
         if(!ws.location) return null;
-        return {
-            ...ws,
-            dist: parseFloat(getDistance(loc.lat, loc.lng, ws.location.lat, ws.location.lng))
-        };
+        let d = 9999;
+        if(loc.lat !== 0) {
+             d = parseFloat(getDistance(loc.lat, loc.lng, ws.location.lat, ws.location.lng));
+        }
+        return { ...ws, dist: d };
     }).filter(ws => ws !== null).sort((a, b) => a.dist - b.dist).slice(0, 5);
 
     if (nearbyShopsCache.length === 0) {
@@ -258,10 +283,13 @@ function renderSingleShopCard(shop) {
     const container = document.getElementById('activeWholesalerCard');
     if(!container) return;
 
+    // Check for huge distance (No GPS)
+    const distText = shop.dist > 5000 ? "GPS Wait" : shop.dist + "KM";
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-1 gap-2">
             <h4 class="font-bold text-gray-800 text-xs truncate flex-1">${shop.shopName}</h4>
-            <span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">${shop.dist}KM</span>
+            <span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">${distText}</span>
         </div>
         <p class="text-[9px] text-gray-500 truncate mb-1"><i class="fa-solid fa-map-pin mr-1"></i>${shop.address}</p>
         <div class="flex gap-1.5 mt-auto">
@@ -271,7 +299,7 @@ function renderSingleShopCard(shop) {
 }
 
 // ============================
-// GLOBAL EXPORT (CRITICAL FIX)
+// GLOBAL EXPORT
 // ============================
 window.mapManager = {
     initDeliveryMap,
