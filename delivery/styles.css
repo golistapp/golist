@@ -1,123 +1,86 @@
 /* =========================================
-   1. GLOBAL DEFAULTS & FONTS
+   BASE & UTILITIES
    ========================================= */
-body { 
-    font-family: 'Inter', sans-serif; 
-    -webkit-tap-highlight-color: transparent; 
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
 }
 
-/* Hide Scrollbar but keep functionality */
+/* Hide Scrollbar */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Modal Overlay Background */
-.modal-overlay { 
-    background: rgba(0,0,0,0.6); 
-    backdrop-filter: blur(2px); 
-}
-
-/* =========================================
-   2. LOGIN PAGE STYLES
-   ========================================= */
-.input-group:focus-within { 
-    transform: translateY(-2px); 
-    transition: all 0.3s; 
-}
-
-/* Vehicle Selection Buttons */
-.vehicle-option { 
-    border: 1px solid #e2e8f0; 
-    background: #f8fafc; 
-    color: #64748b; 
-    transition: all 0.2s; 
-}
-.vehicle-option.selected { 
-    background: #369152; 
-    color: white; 
-    border-color: #369152; 
-    box-shadow: 0 4px 6px -1px rgba(54, 145, 82, 0.3);
-}
-
-/* =========================================
-   3. HOME PAGE UI ELEMENTS
-   ========================================= */
-
-/* Toggle Switch (Duty ON/OFF) */
-.toggle-checkbox:checked { right: 0; border-color: #22c55e; }
-.toggle-checkbox:checked + .toggle-label { background-color: #22c55e; }
-
-/* Sidebar & Menu Overlay */
-.sidebar { transform: translateX(-100%); transition: transform 0.3s ease-in-out; }
-.sidebar.open { transform: translateX(0); }
-
-.overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
-.overlay.open { opacity: 1; pointer-events: auto; }
-
-/* Modern Cards */
-.glass-card { 
-    background: #ffffff; 
-    border: 1px solid #e5e7eb; 
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); 
-}
-
 /* Range Slider Styling */
 input[type=range] { -webkit-appearance: none; width: 100%; background: transparent; }
-input[type=range]::-webkit-slider-thumb { 
-    -webkit-appearance: none; 
-    height: 20px; width: 20px; 
-    border-radius: 50%; 
-    background: #f59e0b; 
-    cursor: pointer; 
-    margin-top: -8px; 
-    box-shadow: 0 2px 6px rgba(245,158,11,0.4); 
-    border: 2px solid white; 
+input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%;
+    background: #f59e0b; cursor: pointer; margin-top: -8px;
+    box-shadow: 0 2px 6px rgba(245,158,11,0.4); border: 2px solid white;
 }
-input[type=range]::-webkit-slider-runnable-track { 
-    width: 100%; 
-    height: 6px; 
-    cursor: pointer; 
-    background: #e5e7eb; 
-    border-radius: 4px; 
+input[type=range]::-webkit-slider-runnable-track {
+    width: 100%; height: 6px; cursor: pointer; background: #e5e7eb; border-radius: 4px;
 }
 
-/* Text Stroke Utility (for Celebration Overlay) */
-.text-stroke-black {
-    -webkit-text-stroke: 1px black;
-}
+/* Text Stroke for Celebration */
+.text-stroke-black { -webkit-text-stroke: 1px black; }
 
 /* =========================================
-   4. MAP STYLES (Leaflet)
+   COMPONENTS (Extracted from Tailwind)
    ========================================= */
-#deliveryMap { 
-    height: 100%; 
-    width: 100%; 
-    z-index: 1; 
-    border-radius: 12px; 
+.input-field {
+    width: 100%; background-color: #f9fafb; border: 1px solid #e5e7eb;
+    border-radius: 0.75rem; padding-left: 1rem; padding-right: 1rem; padding-top: 0.875rem; padding-bottom: 0.875rem;
+    font-weight: 700; color: #111827; font-size: 0.875rem;
+    transition: all 0.2s; outline: none;
 }
-.map-container { 
-    height: 320px; 
-    width: 100%; 
-    position: relative; 
-    overflow: hidden; 
-    border-radius: 16px; 
-    border: 1px solid #e5e7eb; 
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); 
+.input-field:focus { border-color: #f59e0b; background-color: #ffffff; ring: 2px solid #f59e0b; }
+
+.sidebar-btn {
+    width: 100%; text-align: left; padding-left: 1rem; padding-right: 1rem; padding-top: 0.75rem; padding-bottom: 0.75rem;
+    border-radius: 0.5rem; color: #374151; font-weight: 600; font-size: 0.875rem;
+    display: flex; align-items: center; gap: 0.75rem; transition: background-color 0.2s;
+}
+.sidebar-btn:hover { background-color: #f3f4f6; }
+
+.stat-card {
+    background-color: white; border-radius: 0.75rem; padding: 0.75rem;
+    border: 1px solid #e5e7eb; display: flex; flex-direction: column; align-items: center;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.stat-card .label { font-size: 10px; color: #9ca3af; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+.stat-card .value { font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem; }
+
+.vehicle-option.selected {
+    background-color: #16a34a; color: white; border-color: #16a34a;
+    box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.3);
 }
 
-/* Custom Marker Icons */
-.custom-div-icon { 
-    background: transparent; 
-    border: none; 
+.action-btn {
+    padding: 0.625rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 700;
+    transition: all 0.2s; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); border-width: 1px;
+    display: flex; align-items: center; justify-content: center;
 }
+.action-btn:active { transform: scale(0.95); }
 
-/* Hide Default Routing Text Instructions (Clean Map) */
-.leaflet-routing-container { display: none !important; }
+.map-ctrl-btn {
+    width: 2.5rem; height: 2.5rem; background-color: white; border-radius: 0.75rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e5e7eb;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.map-ctrl-btn:active { transform: scale(0.95); }
 
 /* =========================================
-   5. ANIMATIONS
+   ANIMATIONS & TRANSITIONS
    ========================================= */
+.fade-in { animation: fadeIn 0.4s ease-out forwards; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* Shake Animation (Error) */
+.animate-slideUp { animation: slideUp 0.3s ease-out forwards; }
+@keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.animate-popIn { animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.5); } 100% { opacity: 1; transform: scale(1); } }
+
 .shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
 @keyframes shake { 
     10%, 90% { transform: translate3d(-1px, 0, 0); } 
@@ -126,31 +89,50 @@ input[type=range]::-webkit-slider-runnable-track {
     40%, 60% { transform: translate3d(4px, 0, 0); } 
 }
 
-/* Fade In */
-.fade-in { animation: fadeIn 0.4s ease-out forwards; }
-@keyframes fadeIn { 
-    from { opacity: 0; transform: translateY(10px); } 
-    to { opacity: 1; transform: translateY(0); } 
-}
-
-/* Slide Up (Modals) */
-.modal-animate { animation: slideUp 0.3s ease-out forwards; }
-@keyframes slideUp { 
-    from { transform: translateY(100%); opacity: 0; } 
-    to { transform: translateY(0); opacity: 1; } 
-}
-
-/* Pulse Border (Active Status) */
-.pulse-border { animation: pulse-orange 2s infinite; }
+/* Pulse Animations */
 @keyframes pulse-orange { 
     0% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 
     70% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); } 
     100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); } 
 }
-
-/* Pop In (Celebration) */
-@keyframes popIn {
-    0% { transform: scale(0.5); opacity: 0; }
-    80% { transform: scale(1.1); opacity: 1; }
-    100% { transform: scale(1); }
+@keyframes pulse-blue {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); } 
+    100% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); } 
 }
+.spin-anim { animation: spin 1s linear infinite; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* Route Blinking */
+.blink-route { animation: route-pulse 1.5s infinite alternate; }
+@keyframes route-pulse { 0% { opacity: 0.6; stroke-width: 6px; } 100% { opacity: 1; stroke-width: 9px; } }
+
+/* =========================================
+   UI MODULES (Sidebar, Toggle, Map)
+   ========================================= */
+/* Toggle Switch */
+.toggle-checkbox:checked { right: 0; border-color: #22c55e; }
+.toggle-checkbox:checked + .toggle-label { background-color: #22c55e; }
+
+/* Sidebar */
+.sidebar { transform: translateX(-100%); transition: transform 0.3s ease-in-out; }
+.sidebar.open { transform: translateX(0); }
+.overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.overlay.open { opacity: 1; pointer-events: auto; }
+
+/* States */
+.state-box {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding-top: 3rem; padding-bottom: 3rem; text-align: center;
+}
+.state-box .icon-circle {
+    width: 5rem; height: 5rem; border-radius: 9999px; display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem; position: relative;
+}
+.state-box .gps-badge {
+    font-size: 0.75rem; color: #6b7280; margin-top: 1rem; background-color: white;
+    border: 1px solid #e5e7eb; padding: 0.25rem 0.75rem; border-radius: 9999px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Map Overrides */
+.custom-div-icon { background: transparent; border: none; }
+.leaflet-routing-container { display: none !important; }
