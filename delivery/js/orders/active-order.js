@@ -1,5 +1,5 @@
 // ==========================================
-// ACTIVE ORDER MANAGEMENT (SMART COMPACT UI)
+// ACTIVE ORDER MANAGEMENT (FIXED SYNTAX)
 // ==========================================
 
 import { db, PARTNER_PAY } from '../config.js';
@@ -103,12 +103,15 @@ function loadActiveOrder(order) {
     const mapSection = document.getElementById('liveMapSection');
     if(mapSection) mapSection.classList.remove('hidden');
 
+    // CRITICAL FIX: Increased Delay to 350ms (Animation takes 300ms)
     if (window.mapManager && window.isOnline) {
         setTimeout(() => {
             window.mapManager.initDeliveryMap();
-            window.mapManager.updateMapVisuals();
-            if(window.mapManager.renderActiveWholesalerWidget) window.mapManager.renderActiveWholesalerWidget();
-        }, 100);
+            setTimeout(() => {
+                if(window.mapManager.updateMapVisuals) window.mapManager.updateMapVisuals();
+                if(window.mapManager.renderActiveWholesalerWidget) window.mapManager.renderActiveWholesalerWidget();
+            }, 50);
+        }, 350); 
     }
 }
 
@@ -141,7 +144,7 @@ function getWeightInKg(qtyString) {
 }
 
 // ============================
-// RENDERING LOGIC (UPDATED)
+// RENDERING LOGIC
 // ============================
 
 function renderOrderDetails(o) {
@@ -170,10 +173,8 @@ function renderOrderDetails(o) {
         // Find header inside
         let header = itemsContainer.querySelector('h4');
         if(!header) {
-            // Reconstruct container if header missing (fallback)
              itemsContainer.innerHTML = `<h4 class="text-xs font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-2 flex justify-between items-center cursor-pointer" onclick="window.toggleItemsList()"><span>Order Items</span> <i class="fa-solid fa-chevron-up transition-transform duration-300" id="toggleItemsIcon"></i></h4><ul id="actItems" class="text-sm space-y-2 font-medium"></ul>`;
         } else {
-             // Ensure onclick is there
              header.className = "text-xs font-bold text-gray-400 uppercase mb-2 border-b border-gray-100 pb-2 flex justify-between items-center cursor-pointer";
              header.setAttribute('onclick', 'window.toggleItemsList()');
              header.innerHTML = `<span>Order Items</span> <i class="fa-solid fa-chevron-up transition-transform duration-300" id="toggleItemsIcon"></i>`;
@@ -204,32 +205,26 @@ function renderOrderDetails(o) {
             const count = parseInt(i.count) || 1;
             const total = price * count;
 
-            // 1. Calculate Total Weight (e.g. 500g * 5 = 2.5kg)
             let weightLabel = '';
             let rawUnit = i.qty || '';
-            const weightPerUnit = getWeightInKg(rawUnit); // 0.5
+            const weightPerUnit = getWeightInKg(rawUnit); 
 
             if(weightPerUnit > 0) {
-                const totalWeightKg = weightPerUnit * count; // 2.5
+                const totalWeightKg = weightPerUnit * count;
                 if(totalWeightKg >= 1) {
-                    // Show in KG if >= 1kg
                     weightLabel = `${parseFloat(totalWeightKg.toFixed(2))} kg`; 
                 } else {
-                    // Show in Grams
                     weightLabel = `${Math.round(totalWeightKg * 1000)} g`;
                 }
             } else {
-                // If unit is "Packet", "Pcs" (non-weight)
                 weightLabel = rawUnit;
             }
 
-            // 2. Price Per Unit Text (e.g. ₹35/500gm)
             const priceUnitText = rawUnit ? `/${rawUnit}` : '/unit';
 
             const li = document.createElement('li');
             li.className = "flex items-center justify-between py-2 border-b border-gray-100 last:border-0";
 
-            // --- COMPACT LAYOUT HTML ---
             li.innerHTML = `
                 <div class="flex items-center gap-2 flex-1 overflow-hidden">
                     <div class="bg-blue-50 text-blue-700 text-xs font-extrabold px-1.5 py-1 rounded-md border border-blue-100 min-w-[28px] text-center shadow-sm">
@@ -252,7 +247,6 @@ function renderOrderDetails(o) {
         });
     }
 
-    // --- EXTRA DETAILS ---
     const extraDetails = document.getElementById('actExtraDetails');
     const weight = calculateOrderWeight(o.cart);
 
