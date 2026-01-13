@@ -1,10 +1,10 @@
 // ==========================================
-// MAP, ROUTING & VISUALIZATION MANAGER
+// MAP, ROUTING & VISUALIZATION MANAGER (FIXED)
 // ==========================================
 
 import { db } from '../config.js';
 import { getLocation, getActiveOrder, getRadius } from '../core/state.js';
-import { getDistance, showToast, toggleClass } from '../utils.js';
+import { getDistance, showToast } from '../utils.js';
 
 let map = null;
 let layerGroup = null;
@@ -17,6 +17,9 @@ let currentShopIndex = 0;
 let nearbyShopsCache = [];
 
 export async function initDeliveryMap() {
+    // Safety check: Agar map container nahi hai to ruk jao
+    if (!document.getElementById('deliveryMap')) return;
+
     if (map) {
         map.invalidateSize();
         return;
@@ -24,50 +27,71 @@ export async function initDeliveryMap() {
 
     console.log("Initializing Leaflet Map...");
     const loc = getLocation();
-    const startLat = loc.lat || 20.5937;
+    const startLat = loc.lat || 20.5937; // Default India center if no GPS
     const startLng = loc.lng || 78.9629;
 
     // 1. Create Map
-    map = L.map('deliveryMap', { zoomControl: false, attributionControl: false })
-           .setView([startLat, startLng], 14);
+    try {
+        map = L.map('deliveryMap', { zoomControl: false, attributionControl: false })
+               .setView([startLat, startLng], 14);
 
-    // 2. Add Tiles (Light Theme)
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
-    }).addTo(map);
+        // 2. Add Tiles (Light Theme)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
 
-    layerGroup = L.layerGroup().addTo(map);
-    document.getElementById('mapLoader').classList.add('hidden');
+        layerGroup = L.layerGroup().addTo(map);
 
-    // 3. Setup Controls & Listeners
-    setupMapControls();
-    fetchWholesalersForMap(); // Start fetching shops background
+        const loader = document.getElementById('mapLoader');
+        if(loader) loader.classList.add('hidden');
+
+        // 3. Setup Controls & Listeners
+        setupMapControls();
+        fetchWholesalersForMap(); // Start fetching shops background
+    } catch (e) {
+        console.error("Map Init Error:", e);
+    }
 }
 
 function setupMapControls() {
     // Recenter Button
-    document.getElementById('btnRecenter').onclick = () => {
-        const l = getLocation();
-        if(l.lat) map.flyTo([l.lat, l.lng], 16, { animate: true, duration: 1.5 });
-    };
+    const btnRecenter = document.getElementById('btnRecenter');
+    if (btnRecenter) {
+        btnRecenter.onclick = () => {
+            const l = getLocation();
+            if(l.lat && map) map.flyTo([l.lat, l.lng], 16, { animate: true, duration: 1.5 });
+            else showToast("Waiting for GPS...");
+        };
+    }
 
     // Refresh GPS/Map Button
-    document.getElementById('btnRefreshMap').onclick = () => {
-        const icon = document.querySelector('#btnRefreshMap i');
-        icon.classList.add('spin-anim');
-        setTimeout(() => icon.classList.remove('spin-anim'), 1000);
-        updateMapVisuals(); // Force re-render
-        showToast("Map Synced");
-    };
+    const btnRefresh = document.getElementById('btnRefreshMap');
+    if (btnRefresh) {
+        btnRefresh.onclick = () => {
+            const icon = btnRefresh.querySelector('i');
+            if(icon) {
+                icon.classList.add('spin-anim');
+                setTimeout(() => icon.classList.remove('spin-anim'), 1000);
+            }
+            updateMapVisuals(); // Force re-render
+            showToast("Map Synced");
+        };
+    }
 
     // Toggle Shops Button
-    document.getElementById('btnToggleShops').onclick = toggleShopMarkers;
+    const btnToggle = document.getElementById('btnToggleShops');
+    if (btnToggle) btnToggle.onclick = toggleShopMarkers;
 
     // Wholesaler Carousel Next Button
-    document.getElementById('btnNextShop').onclick = () => {
-        currentShopIndex = (currentShopIndex + 1) % nearbyShopsCache.length;
-        renderSingleShopCard(nearbyShopsCache[currentShopIndex]);
-    };
+    const btnNext = document.getElementById('btnNextShop');
+    if (btnNext) {
+        btnNext.onclick = () => {
+            if(nearbyShopsCache.length > 0) {
+                currentShopIndex = (currentShopIndex + 1) % nearbyShopsCache.length;
+                renderSingleShopCard(nearbyShopsCache[currentShopIndex]);
+            }
+        };
+    }
 }
 
 // ============================
@@ -105,7 +129,10 @@ export function updateMapVisuals() {
         drawRoute(loc.lat, loc.lng, dest.lat, dest.lng);
     } else {
         // Clear route if no active order
-        if (routeControl) { try { map.removeControl(routeControl); } catch(e){} routeControl = null; }
+        if (routeControl) { 
+            try { map.removeControl(routeControl); } catch(e){} 
+            routeControl = null; 
+        }
     }
 
     // 3. WHOLESALER MARKERS (Orange)
@@ -115,20 +142,30 @@ export function updateMapVisuals() {
 function drawRoute(startLat, startLng, endLat, endLng) {
     if (routeControl) { try { map.removeControl(routeControl); } catch(e){} }
 
-    routeControl = L.Routing.control({
-        waypoints: [L.latLng(startLat, startLng), L.latLng(endLat, endLng)],
-        lineOptions: { styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route' }] },
-        createMarker: () => null,
-        addWaypoints: false, draggableWaypoints: false, fitSelectedRoutes: true, showAlternatives: false,
-        containerClassName: 'hidden-routing-container'
-    }).on('routesfound', (e) => {
-        const summary = e.routes[0].summary;
-        // Update Dashboard Stats
-        const timeBox = document.getElementById('liveTimeBox');
-        const distBox = document.getElementById('liveDistBox');
-        if (timeBox) timeBox.innerText = Math.round(summary.totalTime / 60) + " min";
-        if (distBox) distBox.innerText = (summary.totalDistance / 1000).toFixed(1) + " KM";
-    }).addTo(map);
+    // Check if Routing Machine is loaded
+    if (!L.Routing) return;
+
+    try {
+        routeControl = L.Routing.control({
+            waypoints: [L.latLng(startLat, startLng), L.latLng(endLat, endLng)],
+            lineOptions: { styles: [{ color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route' }] },
+            createMarker: () => null,
+            addWaypoints: false, 
+            draggableWaypoints: false, 
+            fitSelectedRoutes: true, 
+            showAlternatives: false,
+            containerClassName: 'hidden-routing-container' // Hides the text instructions box
+        }).on('routesfound', (e) => {
+            const summary = e.routes[0].summary;
+            // Update Dashboard Stats
+            const timeBox = document.getElementById('liveTimeBox');
+            const distBox = document.getElementById('liveDistBox');
+            if (timeBox) timeBox.innerText = Math.round(summary.totalTime / 60) + " min";
+            if (distBox) distBox.innerText = (summary.totalDistance / 1000).toFixed(1) + " KM";
+        }).addTo(map);
+    } catch(e) {
+        console.warn("Routing Error:", e);
+    }
 }
 
 // ============================
@@ -151,13 +188,15 @@ function toggleShopMarkers() {
     const btn = document.getElementById('btnToggleShops');
     const ind = document.getElementById('shopIndicator');
 
+    if(!btn) return;
+
     if (showShopsOnMap) {
         btn.classList.replace('text-gray-400', 'text-amber-600');
-        ind.classList.remove('hidden');
+        if(ind) ind.classList.remove('hidden');
         showToast("Shops Visible");
     } else {
         btn.classList.replace('text-amber-600', 'text-gray-400');
-        ind.classList.add('hidden');
+        if(ind) ind.classList.add('hidden');
         showToast("Shops Hidden");
     }
     updateMapVisuals();
@@ -166,6 +205,7 @@ function toggleShopMarkers() {
 function renderWholesalerMarkers(myLoc) {
     const radius = getRadius();
     approvedWholesalers.forEach(ws => {
+        if(!ws.location) return;
         const dist = parseFloat(getDistance(myLoc.lat, myLoc.lng, ws.location.lat, ws.location.lng));
         if (dist <= radius) {
             const icon = L.divIcon({
@@ -187,13 +227,16 @@ export function renderActiveWholesalerWidget() {
     const nextBtn = document.getElementById('btnNextShop');
     const loc = getLocation();
 
-    if (!container || !approvedWholesalers.length) return;
+    if (!container) return;
 
     // Filter & Sort Nearby
-    nearbyShopsCache = approvedWholesalers.map(ws => ({
-        ...ws,
-        dist: parseFloat(getDistance(loc.lat, loc.lng, ws.location.lat, ws.location.lng))
-    })).sort((a, b) => a.dist - b.dist).slice(0, 5);
+    nearbyShopsCache = approvedWholesalers.map(ws => {
+        if(!ws.location) return null;
+        return {
+            ...ws,
+            dist: parseFloat(getDistance(loc.lat, loc.lng, ws.location.lat, ws.location.lng))
+        };
+    }).filter(ws => ws !== null).sort((a, b) => a.dist - b.dist).slice(0, 5);
 
     if (nearbyShopsCache.length === 0) {
         container.innerHTML = `<div class="flex items-center justify-center h-full text-gray-400 text-xs gap-2"><i class="fa-solid fa-store-slash"></i> No shops nearby</div>`;
@@ -201,8 +244,11 @@ export function renderActiveWholesalerWidget() {
         return;
     }
 
-    if (nearbyShopsCache.length > 1) nextBtn.classList.remove('hidden');
-    else nextBtn.classList.add('hidden');
+    if (nearbyShopsCache.length > 1) {
+        if(nextBtn) nextBtn.classList.remove('hidden');
+    } else {
+        if(nextBtn) nextBtn.classList.add('hidden');
+    }
 
     renderSingleShopCard(nearbyShopsCache[currentShopIndex] || nearbyShopsCache[0]);
 }
@@ -210,6 +256,8 @@ export function renderActiveWholesalerWidget() {
 function renderSingleShopCard(shop) {
     if(!shop) return;
     const container = document.getElementById('activeWholesalerCard');
+    if(!container) return;
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-1 gap-2">
             <h4 class="font-bold text-gray-800 text-xs truncate flex-1">${shop.shopName}</h4>
@@ -221,3 +269,12 @@ function renderSingleShopCard(shop) {
              <button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${shop.location.lat},${shop.location.lng}')" class="bg-blue-50 text-blue-600 w-6 h-6 rounded flex items-center justify-center"><i class="fa-solid fa-location-arrow text-[10px]"></i></button>
         </div>`;
 }
+
+// ============================
+// GLOBAL EXPORT (CRITICAL FIX)
+// ============================
+window.mapManager = {
+    initDeliveryMap,
+    updateMapVisuals,
+    renderActiveWholesalerWidget
+};
