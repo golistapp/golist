@@ -136,3 +136,28 @@ input[type=range]::-webkit-slider-runnable-track {
 /* Map Overrides */
 .custom-div-icon { background: transparent; border: none; }
 .leaflet-routing-container { display: none !important; }
+
+/* =========================================
+   TOGGLE SWITCH ANIMATION FIX
+   ========================================= */
+/* Default State (Offline) */
+.toggle-checkbox {
+    transition: transform 0.3s ease-in-out, border-color 0.3s;
+    transform: translateX(0);
+    border-color: #e5e7eb; /* Gray-200 */
+}
+
+/* Checked State (Online) - Move Right */
+.toggle-checkbox:checked {
+    transform: translateX(100%); /* Moves 100% of its width to the right */
+    border-color: #22c55e; /* Green-500 */
+}
+
+/* Label Background Color Change */
+.toggle-label {
+    transition: background-color 0.3s;
+}
+
+.toggle-checkbox:checked + .toggle-label {
+    background-color: #22c55e; /* Green-500 */
+}
