@@ -1,10 +1,10 @@
 // ==========================================
-// VIEW ROUTER (FIXED MAP IMPORT)
+// VIEW ROUTER (FIXED VISIBILITY LOGIC)
 // ==========================================
 
 import { db } from './config.js';
-import { initSession, getUser, clearSession, saveSession, setRadius, getLocation } from './core/state.js';
-import { toggleClass, showToast, getDistance } from './utils.js';
+import { initSession, getUser, clearSession, saveSession, setRadius, getLocation, getDutyStatus } from './core/state.js';
+import { showToast, getDistance } from './utils.js';
 import { refreshOrderList } from './orders/order-list.js';
 
 // DOM Elements
@@ -31,7 +31,7 @@ async function loadDashboard() {
         await import('./core/gps.service.js');
         await import('./core/duty.service.js');
 
-        // 2. Load Map Manager (CRITICAL FIX: Added this import)
+        // 2. Load Map Manager
         await import('./features/map.manager.js');
 
         // 3. Load Order Logic
@@ -74,16 +74,26 @@ function setupDashboardUI() {
 
     // Radius Slider
     if (els.slider) {
-        els.slider.value = 5;
-        if(els.sliderVal) els.sliderVal.innerText = "5";
-        setRadius(5);
+        // Load saved radius or default to 5
+        let savedRadius = 5;
+        try { savedRadius = parseInt(localStorage.getItem('rmz_pref_radius')) || 5; } catch(e){}
+
+        els.slider.value = savedRadius;
+        if(els.sliderVal) els.sliderVal.innerText = savedRadius;
+        setRadius(savedRadius);
 
         els.slider.oninput = function() {
             const km = this.value;
             if(els.sliderVal) els.sliderVal.innerText = km;
             if(els.scanKm) els.scanKm.innerText = km;
             setRadius(km);
-            refreshOrderList(); // Refresh orders on slide
+            localStorage.setItem('rmz_pref_radius', km);
+            refreshOrderList(); 
+
+            // Map update trigger
+            if(window.mapManager && window.mapManager.updateMapVisuals) {
+                window.mapManager.updateMapVisuals();
+            }
         };
     }
 
@@ -112,6 +122,18 @@ function renderWholesalerStrip() {
     const container = document.getElementById('wsListContainer');
     const strip = document.getElementById('wholesalerStrip');
 
+    // [FIX] Visibility Checks
+    // 1. Agar switch off hai (Offline) -> Hide
+    const isOnline = document.getElementById('dutySwitch')?.checked;
+    // 2. Agar Active Order panel khula hai -> Hide
+    const isActive = !document.getElementById('activeOrderPanel')?.classList.contains('hidden');
+
+    if (!isOnline || isActive) {
+        if(strip) strip.classList.add('hidden');
+        return;
+    }
+
+    // Data Check
     if(!container || !wholesalerSnapshot || !wholesalerSnapshot.exists()) {
         if(strip) strip.classList.add('hidden');
         return;
@@ -121,26 +143,39 @@ function renderWholesalerStrip() {
     const myLoc = getLocation();
     let count = 0;
 
+    // Convert Snapshot to Array for Sorting (Optional but good)
+    const shops = [];
     wholesalerSnapshot.forEach(child => {
-        const ws = child.val();
+        shops.push({ ...child.val() });
+    });
+
+    // Sort by distance (Najdeek pehle)
+    shops.sort((a, b) => {
+        const da = myLoc.lat && a.location ? getDistance(myLoc.lat, myLoc.lng, a.location.lat, a.location.lng) : 9999;
+        const db = myLoc.lat && b.location ? getDistance(myLoc.lat, myLoc.lng, b.location.lat, b.location.lng) : 9999;
+        return da - db;
+    });
+
+    shops.forEach(ws => {
         let distTag = '';
 
-        // Calculate Distance if Location Available
+        // Calculate Distance
         if(myLoc.lat && ws.location) {
             const d = getDistance(myLoc.lat, myLoc.lng, ws.location.lat, ws.location.lng);
-            distTag = `<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">${d} KM</span>`;
+            distTag = `<span class="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold border border-amber-200">${d} KM</span>`;
         }
 
         const card = `
-        <div class="snap-start shrink-0 w-64 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col">
-            <div class="flex justify-between items-start mb-1">
+        <div class="snap-start shrink-0 w-64 bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col relative">
+            <div class="flex justify-between items-start mb-2">
                 <h4 class="font-bold text-gray-800 text-sm truncate w-40">${ws.shopName}</h4>
                 ${distTag}
             </div>
-            <p class="text-[10px] text-gray-500 truncate mb-2"><i class="fa-solid fa-map-pin mr-1"></i>${ws.address}</p>
+            <p class="text-[10px] text-gray-500 truncate mb-3"><i class="fa-solid fa-location-dot mr-1"></i>${ws.address}</p>
             <div class="flex gap-2 mt-auto">
-                <a href="tel:${ws.ownerMobile}" class="flex-1 bg-gray-50 text-gray-600 text-[10px] font-bold py-2 rounded text-center border border-gray-100"><i class="fa-solid fa-phone"></i> Call</a>
-                <a href="https://www.google.com/maps/dir/?api=1&destination=${ws.location.lat},${ws.location.lng}" target="_blank" class="flex-1 bg-blue-50 text-blue-600 text-[10px] font-bold py-2 rounded text-center border border-blue-100"><i class="fa-solid fa-location-arrow"></i> Map</a>
+                <a href="tel:${ws.ownerMobile}" class="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition"><i class="fa-solid fa-phone text-xs"></i></a>
+                <a href="https://www.google.com/maps/dir/?api=1&destination=${ws.location.lat},${ws.location.lng}" target="_blank" class="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition"><i class="fa-solid fa-location-arrow text-xs"></i></a>
+                <button class="flex-1 bg-gray-100 text-gray-700 text-[10px] font-bold py-1.5 rounded-lg border border-gray-200 hover:bg-gray-200" onclick="alert('Shop: ${ws.shopName}\\nMobile: ${ws.ownerMobile}\\nAddress: ${ws.address}')">View</button>
             </div>
         </div>`;
 
@@ -149,6 +184,7 @@ function renderWholesalerStrip() {
     });
 
     if(count > 0 && strip) strip.classList.remove('hidden');
+    else if (strip) strip.classList.add('hidden');
 }
 
 function setupSidebarActions(user) {
