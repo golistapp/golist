@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Map Service (Updated: Instant Route Fix)
+// MODULE: Map Service (Speed & Stability Update)
 // ==========================================
 
 import { getDistance } from './helpers.js';
@@ -8,21 +8,22 @@ import { showToast } from './ui.js';
 let deliveryMap = null;
 let deliveryLayerGroup = null;
 let routeControl = null;
+let instantPolyline = null; // New: Instant Line ke liye variable
 let showShops = false; 
 
 let currentShopIndex = 0;
 let nearbyShopsCache = [];
 
-// 1. INITIALIZE MAP (With Resize Fix)
+// 1. INITIALIZE MAP
 export function initMap() {
     const mapContainer = document.getElementById('deliveryMap');
 
     // Resize Fix: Agar map pehle se hai, to bas resize karo
     if(deliveryMap) {
         setTimeout(() => {
-            deliveryMap.invalidateSize(); // Force Map to fit container
-            updateMapVisuals(); // Redraw everything
-        }, 300); // 300ms animation delay
+            deliveryMap.invalidateSize(); 
+            updateMapVisuals(); 
+        }, 300); 
         return;
     }
 
@@ -50,7 +51,7 @@ export function initMap() {
     const section = document.getElementById('liveMapSection');
     if(section) section.classList.remove('hidden');
 
-    // IMPORTANT: Wait for modal animation to finish, then resize
+    // Wait for animation then resize
     setTimeout(() => {
         deliveryMap.invalidateSize();
     }, 400);
@@ -61,7 +62,7 @@ export function initMap() {
 // 2. RECENTER MAP
 export function recenterMap() {
     if(deliveryMap && window.Ramazone.location.lat) {
-        deliveryMap.invalidateSize(); // Safety Resize
+        deliveryMap.invalidateSize(); 
         deliveryMap.flyTo([window.Ramazone.location.lat, window.Ramazone.location.lng], 16, { animate: true, duration: 0.5 });
     } else {
         showToast("Waiting for GPS...");
@@ -81,20 +82,20 @@ export function forceRefreshRoute() {
 
     if(!myLat || myLat === 0) return showToast("Waiting for GPS...");
 
-    showToast("Redrawing Path...");
+    showToast("Calculating Path...");
 
-    // Clear old route explicitly
+    // Reset Logic
     if(routeControl) {
         try { deliveryMap.removeControl(routeControl); } catch(e) {}
         routeControl = null;
     }
 
-    // Small delay to ensure clean state
-    setTimeout(() => {
-        drawRoute(myLat, myLng, custLat, custLng);
-        const bounds = L.latLngBounds([ [myLat, myLng], [custLat, custLng] ]);
-        deliveryMap.fitBounds(bounds, { padding: [50, 50] });
-    }, 100);
+    // Background call
+    drawRoute(myLat, myLng, custLat, custLng);
+
+    // Fit Bounds
+    const bounds = L.latLngBounds([ [myLat, myLng], [custLat, custLng] ]);
+    deliveryMap.fitBounds(bounds, { padding: [50, 50] });
 }
 
 // 4. REFRESH DATA
@@ -121,18 +122,16 @@ export function refreshMapData() {
     }
 }
 
-// 5. VISUAL UPDATER
+// 5. VISUAL UPDATER (The Brain)
 export function updateMapVisuals() {
     if(!deliveryMap || !deliveryLayerGroup) return;
 
     deliveryLayerGroup.clearLayers();
 
-    // Remove old route logic moved inside drawRoute to avoid flickering
-
     const myLat = window.Ramazone.location.lat;
     const myLng = window.Ramazone.location.lng;
 
-    // A. RIDER
+    // A. RIDER MARKER
     if(myLat && myLng && myLat !== 0) {
         const riderIcon = L.divIcon({
             className: 'custom-div-icon',
@@ -161,13 +160,19 @@ export function updateMapVisuals() {
 
         L.marker([custLat, custLng], {icon: custIcon}).addTo(deliveryLayerGroup);
 
-        // Draw Route ONLY if we have valid Rider Coordinates
         if(myLat && myLng && myLat !== 0) {
-            drawRoute(myLat, myLng, custLat, custLng);
+            // 🚀 FAST: Dotted Line (Instant)
+            drawInstantLine(myLat, myLng, custLat, custLng);
+
+            // 🚀 SLOW: Road Route (Background)
+            // Agar pehle se route nahi hai, tabhi maango
+            if(!routeControl) {
+                drawRoute(myLat, myLng, custLat, custLng);
+            }
         }
     }
 
-    // C. SHOPS
+    // C. SHOPS (Logic Unchanged)
     if(showShops && window.Ramazone.approvedWholesalers.length > 0) {
         window.Ramazone.approvedWholesalers.forEach(ws => {
             if(ws.location) {
@@ -209,29 +214,65 @@ export function updateMapVisuals() {
     }
 }
 
-// 6. DRAW ROUTE
+// 6. DRAW INSTANT LINE (New Feature)
+export function drawInstantLine(lat1, lng1, lat2, lng2) {
+    // Agar asli route aa chuka hai, to dotted line mat banao
+    if(routeControl && routeControl._routes && routeControl._routes.length > 0) {
+        if(instantPolyline) {
+            deliveryMap.removeLayer(instantPolyline);
+            instantPolyline = null;
+        }
+        return;
+    }
+
+    // Clean old dotted line
+    if(instantPolyline) {
+        deliveryMap.removeLayer(instantPolyline);
+    }
+
+    // Draw New Dotted Line (Gray Color)
+    instantPolyline = L.polyline([[lat1, lng1], [lat2, lng2]], {
+        color: '#9ca3af', 
+        weight: 4,
+        dashArray: '10, 10', 
+        opacity: 0.7
+    }).addTo(deliveryMap);
+}
+
+// 7. DRAW ROUTE (Background Process)
 function drawRoute(startLat, startLng, endLat, endLng) {
     if(!deliveryMap) return;
 
-    // Prevent duplicate routes: Clear existing if endpoints are same (Optional optimization)
     if(routeControl) {
         try { deliveryMap.removeControl(routeControl); } catch(e) {}
     }
 
     routeControl = L.Routing.control({
         waypoints: [ L.latLng(startLat, startLng), L.latLng(endLat, endLng) ],
-        lineOptions: { styles: [{color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route'}] },
-        createMarker: function() { return null; },
+        lineOptions: { 
+            styles: [{color: '#3b82f6', opacity: 0.9, weight: 6, className: 'blink-route'}],
+            addWaypoints: false 
+        },
+        createMarker: function() { return null; }, 
         addWaypoints: false,
         draggableWaypoints: false,
-        fitSelectedRoutes: true,
+        fitSelectedRoutes: false, 
         showAlternatives: false,
-        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }), // Explicit Router
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }),
         containerClassName: 'hidden-routing-container'
-    }).on('routesfound', function(e) {
+    })
+    .on('routesfound', function(e) {
+        // Success: Asli Route Mil Gaya
+
+        // 1. Dotted Line Hatao
+        if(instantPolyline) {
+            deliveryMap.removeLayer(instantPolyline);
+            instantPolyline = null;
+        }
+
+        // 2. Stats Update Karo
         const routes = e.routes;
         const summary = routes[0].summary;
-
         const distKm = (summary.totalDistance / 1000).toFixed(1);
         const timeMin = Math.round(summary.totalTime / 60);
 
@@ -240,10 +281,14 @@ function drawRoute(startLat, startLng, endLat, endLng) {
 
         if(timeBox) timeBox.innerText = timeMin + " min";
         if(distBox) distBox.innerText = distKm + " KM";
-    }).addTo(deliveryMap);
+    })
+    .on('routingerror', function() {
+        console.log("Routing failed, keeping instant line.");
+    })
+    .addTo(deliveryMap);
 }
 
-// 7. WIDGET
+// 8. WIDGET (Unchanged)
 export function renderActiveWholesalerWidget() {
     const container = document.getElementById('activeWholesalerCard');
     const nextBtn = document.getElementById('btnNextShop');
@@ -282,7 +327,7 @@ export function renderActiveWholesalerWidget() {
 
     window.zoomToShop = (lat, lng) => {
         if(deliveryMap) {
-            deliveryMap.invalidateSize(); // Fix before flying
+            deliveryMap.invalidateSize(); 
             deliveryMap.flyTo([lat, lng], 17, { animate: true, duration: 1 });
         }
     };
@@ -302,7 +347,7 @@ export function renderActiveWholesalerWidget() {
     `;
 }
 
-// 8. HELPERS
+// 9. HELPERS
 export function setShowShops(isVisible) {
     showShops = isVisible;
     const btn = document.getElementById('btnToggleShops');

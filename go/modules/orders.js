@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Orders Management (Updated: Auto-Show Shops)
+// MODULE: Orders Management (Route Speed Fix Only)
 // ==========================================
 
 import { db } from './firebase-config.js';
@@ -12,7 +12,6 @@ const PARTNER_PAY = 20; // Fixed earning per order
 
 // 1. LISTEN FOR NEARBY ORDERS
 export function listenOrders() {
-    // Agar offline hain to listener band rakho
     if (!window.Ramazone.isOnline) {
         if (ordersListener) { db.ref('orders').off(); ordersListener = null; }
         return;
@@ -22,7 +21,7 @@ export function listenOrders() {
     if (!list) return;
 
     ordersListener = db.ref('orders').on('value', snap => {
-        if (!window.Ramazone.isOnline) return; // Double check
+        if (!window.Ramazone.isOnline) return; 
 
         list.innerHTML = '';
         let count = 0;
@@ -93,7 +92,7 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
 
     let prodTxt = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => `${i.count}x ${i.name}`).join(', ') : 'Items';
 
-    // Global Wrappers for onclick (Module Scope Fix)
+    // Global Wrappers
     window.tempOrderAction = function(actionId) {
         if(window.Ramazone.activeOrder && window.Ramazone.activeOrder.id === actionId) {
             loadActiveOrder(actionId, window.Ramazone.activeOrder);
@@ -199,7 +198,7 @@ export function checkForActiveOrder() {
     });
 }
 
-// 4. LOAD ACTIVE ORDER UI (Updated: Auto-Show Shops)
+// 4. LOAD ACTIVE ORDER UI (Standard UI, Fast Map)
 export async function loadActiveOrder(id, o) {
     window.Ramazone.activeOrder = {id, ...o};
 
@@ -211,7 +210,7 @@ export async function loadActiveOrder(id, o) {
     document.getElementById('activeOrderPanel').classList.remove('hidden');
     document.getElementById('wholesalerStrip').classList.add('hidden');
 
-    // Fill Data (UI Code same as before)
+    // Fill Data
     document.getElementById('actCust').innerText = o.user?.name || "Customer";
     document.getElementById('actAddr').innerText = o.location?.address || "Unknown";
     document.getElementById('actPrefTime').innerText = o.preferences?.deliveryTime || "Standard";
@@ -270,15 +269,11 @@ export async function loadActiveOrder(id, o) {
 
     updateBtnUI(o.status);
 
-    // ⚡⚡ NEW LOGIC: LAZY LOAD MAP & AUTO-SHOW SHOPS ⚡⚡
+    // ⚡⚡ LAZY LOAD MAP ⚡⚡
     const MapModule = await import('./map.js');
     MapModule.initMap(); 
-    MapModule.updateMapVisuals();
-
-    // 🔥 AUTO-SHOW SHOPS ON MAP (User Requirement)
+    MapModule.updateMapVisuals(); // Iske andar ab Instant Line call hoti hai
     MapModule.setShowShops(true); 
-
-    // 10KM limit wala widget refresh karo
     MapModule.renderActiveWholesalerWidget();
 }
 
