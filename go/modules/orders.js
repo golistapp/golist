@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Orders Management (Route Speed Fix Only)
+// MODULE: Orders Management (Updated: Hide/Show Items + Delivery Time Label)
 // ==========================================
 
 import { db } from './firebase-config.js';
@@ -112,6 +112,7 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
     const div = document.createElement('div');
     div.className = `${isMyOrder ? "bg-blue-50 border border-blue-200 shadow-sm" : "glass-card"} p-4 rounded-xl relative mb-4`;
 
+    // Update: 'Pref. Time' changed to 'Delivery Time'
     div.innerHTML = `
         <div class="flex justify-between items-start mb-2">
             <h4 class="font-bold text-gray-900 text-lg">${shopName}</h4>
@@ -122,7 +123,7 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
             <p class="truncate"><i class="fa-solid fa-location-dot mr-1"></i> ${address}</p>
             <div class="grid grid-cols-2 gap-2 mt-3 mb-2">
                 <div class="bg-gray-50 p-2 rounded border border-gray-200 flex flex-col items-center justify-center">
-                    <span class="text-[9px] text-gray-400 uppercase font-bold">Pref. Time</span><span class="text-xs font-bold text-blue-600 truncate">${prefTime}</span>
+                    <span class="text-[9px] text-gray-400 uppercase font-bold">Delivery Time</span><span class="text-xs font-bold text-blue-600 truncate">${prefTime}</span>
                 </div>
                 <div class="bg-gray-50 p-2 rounded border border-gray-200 flex flex-col items-center justify-center">
                     <span class="text-[9px] text-gray-400 uppercase font-bold">Budget</span><span class="text-xs font-bold text-pink-600 truncate">${prefBudg}</span>
@@ -198,7 +199,7 @@ export function checkForActiveOrder() {
     });
 }
 
-// 4. LOAD ACTIVE ORDER UI (Standard UI, Fast Map)
+// 4. LOAD ACTIVE ORDER UI (Features: Hide Toggle + Delivery Time)
 export async function loadActiveOrder(id, o) {
     window.Ramazone.activeOrder = {id, ...o};
 
@@ -216,6 +217,13 @@ export async function loadActiveOrder(id, o) {
     document.getElementById('actPrefTime').innerText = o.preferences?.deliveryTime || "Standard";
     document.getElementById('actPrefBudget').innerText = o.preferences?.budget || "Standard";
 
+    // UI Label Update: Pref Time -> Delivery Time
+    const prefTimeContainer = document.getElementById('actPrefTime').parentElement;
+    if(prefTimeContainer) {
+        const label = prefTimeContainer.querySelector('p:first-child'); // The "PREF. TIME" label
+        if(label) label.innerText = "DELIVERY TIME";
+    }
+
     if(o.timestamp) {
         document.getElementById('actOrderTime').innerText = new Date(o.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
@@ -224,8 +232,38 @@ export async function loadActiveOrder(id, o) {
     document.getElementById('billDeliveryFee').innerText = o.payment?.deliveryFee || 0;
     document.getElementById('billGrandTotal').innerText = o.payment?.grandTotal || 0;
 
+    // Feature: Define Toggle Function Globally
+    window.toggleItems = function() {
+        const list = document.getElementById('actItems');
+        const icon = document.getElementById('btnToggleIcon');
+        if(list.classList.contains('hidden')) {
+            list.classList.remove('hidden');
+            if(icon) icon.style.transform = 'rotate(0deg)';
+        } else {
+            list.classList.add('hidden');
+            if(icon) icon.style.transform = 'rotate(180deg)';
+        }
+    };
+
     const ul = document.getElementById('actItems');
     if(ul) {
+        // Find wrapper to inject header with button
+        // Logic: Replace simple "H4" with a click-able Div
+        let container = ul.parentElement;
+        let header = container.querySelector('h4');
+
+        // Safety check: Don't duplicate if already exists
+        if(header && !header.parentElement.classList.contains('cursor-pointer')) {
+            const newHeader = document.createElement('div');
+            newHeader.className = "flex justify-between items-center border-b border-gray-100 pb-2 mb-2 cursor-pointer";
+            newHeader.onclick = window.toggleItems;
+            newHeader.innerHTML = `
+                <h4 class="text-xs font-bold text-gray-400 uppercase">Order Items</h4>
+                <i id="btnToggleIcon" class="fa-solid fa-chevron-up text-gray-400 transition-transform duration-300"></i>
+            `;
+            container.replaceChild(newHeader, header);
+        }
+
         ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
             const price = parseFloat(i.price) || 0;
             const count = parseInt(i.count) || 1;
@@ -269,10 +307,11 @@ export async function loadActiveOrder(id, o) {
 
     updateBtnUI(o.status);
 
-    // ⚡⚡ LAZY LOAD MAP ⚡⚡
+    // ⚡⚡ LAZY LOAD MAP & AUTO-SHOW SHOPS ⚡⚡
+    // Ensuring map loads fast with new features
     const MapModule = await import('./map.js');
     MapModule.initMap(); 
-    MapModule.updateMapVisuals(); // Iske andar ab Instant Line call hoti hai
+    MapModule.updateMapVisuals(); 
     MapModule.setShowShops(true); 
     MapModule.renderActiveWholesalerWidget();
 }
