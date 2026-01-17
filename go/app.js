@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: app.js (Updated with Shop Loading)
+// FILE: app.js (Final Polish: Wiring & Login Fix)
 // ==========================================
 
 console.log("🚀 Initializing Ramazone Partner App...");
@@ -8,7 +8,8 @@ import { initFirebase, db } from './modules/firebase-config.js';
 import * as UI from './modules/ui.js';
 import * as Duty from './modules/duty.js';
 import * as Orders from './modules/orders.js';
-import * as Wholesaler from './modules/wholesaler.js'; // NEW IMPORT
+import * as Wholesaler from './modules/wholesaler.js';
+import * as MapModule from './modules/map.js'; // Import Map for Button Wiring
 
 // GLOBAL STATE
 window.Ramazone = {
@@ -17,7 +18,7 @@ window.Ramazone = {
     location: { lat: 0, lng: 0 },
     activeOrder: null,
     serviceRadius: localStorage.getItem('rmz_pref_radius') || 5,
-    approvedWholesalers: [] // Shops yahan store hongi
+    approvedWholesalers: []
 };
 
 // INITIALIZATION
@@ -26,7 +27,7 @@ async function initApp() {
         // A. Session Check
         const savedUser = localStorage.getItem('rmz_delivery_user');
         if (!savedUser) {
-            window.location.href = 'login.html';
+            window.location.href = 'login.html'; // FIX: Correct Page Name
             return;
         }
         window.Ramazone.user = JSON.parse(savedUser);
@@ -37,7 +38,7 @@ async function initApp() {
         // C. UI Setup
         UI.renderHeader(window.Ramazone.user);
 
-        // D. Check Account
+        // D. Check Account Status
         checkAccountStatus();
 
         // E. Restore Duty
@@ -50,7 +51,7 @@ async function initApp() {
         // F. Check Active Order
         Orders.checkForActiveOrder();
 
-        // G. LOAD ALL SHOPS FOR MAP (Ye Missing tha!)
+        // G. Load Shops
         Wholesaler.fetchAllApprovedShops();
 
     } catch (error) {
@@ -67,36 +68,51 @@ function checkAccountStatus() {
             alert("Your account has been disabled by Admin.");
             Duty.toggleDuty(false);
             localStorage.removeItem('rmz_delivery_user');
-            window.location.href = 'login.html';
+            window.location.href = 'login.html'; // FIX: Correct Page Name
         }
     });
 }
 
-// EVENT LISTENERS
+// EVENT LISTENERS (Traffic Police 🚦)
 document.addEventListener('click', async (e) => {
     const target = e.target;
 
-    // MENU
+    // --- MENU & NAVIGATION ---
     if (target.closest('#menuBtn') || target.closest('#menuOverlay')) {
         UI.toggleSidebar();
     }
+
     if (target.closest('#navLogout')) {
         if(confirm("Logout?")) {
             Duty.toggleDuty(false);
             localStorage.removeItem('rmz_delivery_user');
-            window.location.href = 'login.html';
+            window.location.href = 'login.html'; // FIX: Correct Page Name
         }
     }
 
-    // MAP ACTIONS
-    if (target.closest('#btnRecenterMap') || target.closest('#btnRefreshMap') || target.closest('#btnToggleShops')) {
-        const MapModule = await import('./modules/map.js');
-        if(target.closest('#btnRecenterMap')) MapModule.recenterMap();
-        if(target.closest('#btnRefreshMap')) MapModule.refreshMapData();
-        if(target.closest('#btnToggleShops')) MapModule.toggleShopMarkers();
+    // --- MAP ACTIONS (Using MapModule directly) ---
+
+    // 1. RECENTER
+    if (target.closest('#btnRecenterMap')) {
+        MapModule.recenterMap();
     }
 
-    // HISTORY
+    // 2. REFRESH GPS
+    if (target.closest('#btnRefreshMap')) {
+        MapModule.refreshMapData();
+    }
+
+    // 3. TOGGLE SHOPS
+    if (target.closest('#btnToggleShops')) {
+        MapModule.toggleShopMarkers();
+    }
+
+    // 4. SHOW PATH (The Fix Button)
+    if (target.closest('#btnShowPath')) {
+        MapModule.forceRefreshRoute();
+    }
+
+    // --- HISTORY ---
     if (target.closest('#navHistory')) {
         const HistoryModule = await import('./modules/history.js');
         HistoryModule.openHistoryModal();
@@ -105,7 +121,7 @@ document.addEventListener('click', async (e) => {
         document.getElementById('historyModal').classList.add('hidden');
     }
 
-    // WHOLESALER MODAL
+    // --- WHOLESALER ---
     if (target.closest('#navWholesaler')) {
         Wholesaler.openModal();
     }
@@ -119,7 +135,7 @@ document.addEventListener('click', async (e) => {
         Wholesaler.submitRequest();
     }
 
-    // ORDER ACTIONS
+    // --- ORDER ACTIONS ---
     if (target.id === 'actionBtn') {
         Orders.updateOrderStatus();
     }
@@ -151,10 +167,13 @@ document.getElementById('radiusSlider').addEventListener('input', (e) => {
 
     if(window.Ramazone.isOnline) {
         Orders.listenOrders(); 
+
+        // Update Map Radius Visuals
         if(document.getElementById('liveMapSection').classList.contains('hidden') === false) {
-             import('./modules/map.js').then(m => m.updateMapVisuals());
+             MapModule.updateMapVisuals();
         }
     }
 });
 
+// START
 window.onload = initApp;

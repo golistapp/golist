@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Map Service (Updated: Sync & Routing Fix)
+// MODULE: Map Service (Updated: Instant Route Fix)
 // ==========================================
 
 import { getDistance } from './helpers.js';
@@ -10,14 +10,19 @@ let deliveryLayerGroup = null;
 let routeControl = null;
 let showShops = false; 
 
-// Track currently displayed shop in the widget
 let currentShopIndex = 0;
 let nearbyShopsCache = [];
 
-// 1. INITIALIZE MAP
+// 1. INITIALIZE MAP (With Resize Fix)
 export function initMap() {
+    const mapContainer = document.getElementById('deliveryMap');
+
+    // Resize Fix: Agar map pehle se hai, to bas resize karo
     if(deliveryMap) {
-        deliveryMap.invalidateSize();
+        setTimeout(() => {
+            deliveryMap.invalidateSize(); // Force Map to fit container
+            updateMapVisuals(); // Redraw everything
+        }, 300); // 300ms animation delay
         return;
     }
 
@@ -38,28 +43,32 @@ export function initMap() {
 
     deliveryLayerGroup = L.layerGroup().addTo(deliveryMap);
 
-    // Hide Loader
+    // UI Cleanup
     const loader = document.getElementById('mapLoader');
     if(loader) loader.classList.add('hidden');
 
-    // Show Map Section
     const section = document.getElementById('liveMapSection');
     if(section) section.classList.remove('hidden');
 
-    // Initial Widget Render
+    // IMPORTANT: Wait for modal animation to finish, then resize
+    setTimeout(() => {
+        deliveryMap.invalidateSize();
+    }, 400);
+
     renderActiveWholesalerWidget();
 }
 
 // 2. RECENTER MAP
 export function recenterMap() {
     if(deliveryMap && window.Ramazone.location.lat) {
+        deliveryMap.invalidateSize(); // Safety Resize
         deliveryMap.flyTo([window.Ramazone.location.lat, window.Ramazone.location.lng], 16, { animate: true, duration: 0.5 });
     } else {
         showToast("Waiting for GPS...");
     }
 }
 
-// 3. FORCE ROUTE REFRESH (Manual Button Action)
+// 3. FORCE ROUTE (Manual Button)
 export function forceRefreshRoute() {
     if(!window.Ramazone.activeOrder || !window.Ramazone.activeOrder.location) {
         return showToast("No active destination");
@@ -70,17 +79,25 @@ export function forceRefreshRoute() {
     const custLat = window.Ramazone.activeOrder.location.lat;
     const custLng = window.Ramazone.activeOrder.location.lng;
 
-    if(!myLat || !custLat) return showToast("GPS Waiting...");
+    if(!myLat || myLat === 0) return showToast("Waiting for GPS...");
 
     showToast("Redrawing Path...");
-    drawRoute(myLat, myLng, custLat, custLng);
 
-    // Fit Bounds to show both points
-    const bounds = L.latLngBounds([ [myLat, myLng], [custLat, custLng] ]);
-    deliveryMap.fitBounds(bounds, { padding: [50, 50] });
+    // Clear old route explicitly
+    if(routeControl) {
+        try { deliveryMap.removeControl(routeControl); } catch(e) {}
+        routeControl = null;
+    }
+
+    // Small delay to ensure clean state
+    setTimeout(() => {
+        drawRoute(myLat, myLng, custLat, custLng);
+        const bounds = L.latLngBounds([ [myLat, myLng], [custLat, custLng] ]);
+        deliveryMap.fitBounds(bounds, { padding: [50, 50] });
+    }, 100);
 }
 
-// 4. REFRESH DATA (GPS & Sync)
+// 4. REFRESH DATA
 export function refreshMapData() {
     const icon = document.getElementById('refreshIcon');
     if(icon) icon.classList.add('spin-anim');
@@ -104,23 +121,19 @@ export function refreshMapData() {
     }
 }
 
-// 5. MAIN VISUAL UPDATER
+// 5. VISUAL UPDATER
 export function updateMapVisuals() {
     if(!deliveryMap || !deliveryLayerGroup) return;
 
     deliveryLayerGroup.clearLayers();
 
-    // Clean old route if exists
-    if(routeControl) {
-        try { deliveryMap.removeControl(routeControl); } catch(e) {}
-        routeControl = null;
-    }
+    // Remove old route logic moved inside drawRoute to avoid flickering
 
     const myLat = window.Ramazone.location.lat;
     const myLng = window.Ramazone.location.lng;
 
-    // A. RIDER MARKER
-    if(myLat && myLng) {
+    // A. RIDER
+    if(myLat && myLng && myLat !== 0) {
         const riderIcon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div style="background-color:#3b82f6; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid white; box-shadow: 0 0 10px rgba(59, 130, 246, 0.5);">
@@ -132,7 +145,7 @@ export function updateMapVisuals() {
         L.marker([myLat, myLng], {icon: riderIcon}).addTo(deliveryLayerGroup);
     }
 
-    // B. CUSTOMER MARKER & ROUTE
+    // B. CUSTOMER & ROUTE
     if(window.Ramazone.activeOrder && window.Ramazone.activeOrder.location) {
         const custLat = window.Ramazone.activeOrder.location.lat;
         const custLng = window.Ramazone.activeOrder.location.lng;
@@ -148,22 +161,21 @@ export function updateMapVisuals() {
 
         L.marker([custLat, custLng], {icon: custIcon}).addTo(deliveryLayerGroup);
 
-        if(myLat && myLng) {
+        // Draw Route ONLY if we have valid Rider Coordinates
+        if(myLat && myLng && myLat !== 0) {
             drawRoute(myLat, myLng, custLat, custLng);
         }
     }
 
-    // C. SHOPS (10KM Limit + Click Sync)
+    // C. SHOPS
     if(showShops && window.Ramazone.approvedWholesalers.length > 0) {
         window.Ramazone.approvedWholesalers.forEach(ws => {
             if(ws.location) {
                 const dist = parseFloat(getDistance(myLat, myLng, ws.location.lat, ws.location.lng));
+                if(dist > 10) return; 
 
-                if(dist > 10) return; // Strict 10KM Limit
-
-                // Highlighted Style if this shop is currently in the Widget box
                 const isSelected = (nearbyShopsCache[currentShopIndex] && nearbyShopsCache[currentShopIndex].id === ws.id);
-                const bgColor = isSelected ? '#ea580c' : '#f59e0b'; // Darker Orange if selected
+                const bgColor = isSelected ? '#ea580c' : '#f59e0b';
                 const size = isSelected ? 30 : 24;
                 const zIndex = isSelected ? 1000 : 1;
 
@@ -176,21 +188,15 @@ export function updateMapVisuals() {
                     iconAnchor: [size/2, size/2]
                 });
 
-                const marker = L.marker([ws.location.lat, ws.location.lng], {
-                    icon: shopIcon, 
-                    zIndexOffset: zIndex
-                }).addTo(deliveryLayerGroup);
+                const marker = L.marker([ws.location.lat, ws.location.lng], {icon: shopIcon, zIndexOffset: zIndex}).addTo(deliveryLayerGroup);
 
-                // CLICK SYNC: Marker Click -> Update Widget Box
                 marker.on('click', () => {
-                    // Find index of this shop in our nearby cache
                     const idx = nearbyShopsCache.findIndex(s => s.id === ws.id);
                     if(idx !== -1) {
                         currentShopIndex = idx;
-                        renderActiveWholesalerWidget(); // Update Box
-                        updateMapVisuals(); // Re-render markers to update highlights
+                        renderActiveWholesalerWidget(); 
+                        updateMapVisuals();
 
-                        // Add highlight effect to card
                         const card = document.getElementById('activeWholesalerCard');
                         if(card) {
                             card.parentElement.classList.add('pulse-border');
@@ -203,21 +209,24 @@ export function updateMapVisuals() {
     }
 }
 
-// 6. DRAW ROUTE (With Blinking Line)
+// 6. DRAW ROUTE
 function drawRoute(startLat, startLng, endLat, endLng) {
     if(!deliveryMap) return;
 
+    // Prevent duplicate routes: Clear existing if endpoints are same (Optional optimization)
+    if(routeControl) {
+        try { deliveryMap.removeControl(routeControl); } catch(e) {}
+    }
+
     routeControl = L.Routing.control({
         waypoints: [ L.latLng(startLat, startLng), L.latLng(endLat, endLng) ],
-        lineOptions: { 
-            // BLINK ANIMATION CLASS ADDED
-            styles: [{color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route'}] 
-        },
+        lineOptions: { styles: [{color: '#3b82f6', opacity: 0.8, weight: 6, className: 'blink-route'}] },
         createMarker: function() { return null; },
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
         showAlternatives: false,
+        router: L.Routing.osrmv1({ serviceUrl: 'https://router.project-osrm.org/route/v1' }), // Explicit Router
         containerClassName: 'hidden-routing-container'
     }).on('routesfound', function(e) {
         const routes = e.routes;
@@ -231,11 +240,10 @@ function drawRoute(startLat, startLng, endLat, endLng) {
 
         if(timeBox) timeBox.innerText = timeMin + " min";
         if(distBox) distBox.innerText = distKm + " KM";
-
     }).addTo(deliveryMap);
 }
 
-// 7. WIDGET: CAROUSEL (Updated with Click Sync)
+// 7. WIDGET
 export function renderActiveWholesalerWidget() {
     const container = document.getElementById('activeWholesalerCard');
     const nextBtn = document.getElementById('btnNextShop');
@@ -245,7 +253,6 @@ export function renderActiveWholesalerWidget() {
     const myLat = window.Ramazone.location.lat;
     const myLng = window.Ramazone.location.lng;
 
-    // Refresh Cache: Filter top 5 shops within 10KM
     nearbyShopsCache = window.Ramazone.approvedWholesalers.map(ws => {
         const d = parseFloat(getDistance(myLat, myLng, ws.location.lat, ws.location.lng));
         return { ...ws, dist: d };
@@ -257,29 +264,27 @@ export function renderActiveWholesalerWidget() {
         return;
     }
 
-    // Handle Index Overflow
     if(currentShopIndex >= nearbyShopsCache.length) currentShopIndex = 0;
 
-    // Show Button if more than 1 shop
     if(nearbyShopsCache.length > 1 && nextBtn) {
         nextBtn.classList.remove('hidden');
         nextBtn.onclick = (e) => {
-            e.stopPropagation(); // Prevent zooming when clicking next
+            e.stopPropagation();
             currentShopIndex = (currentShopIndex + 1) % nearbyShopsCache.length;
             renderActiveWholesalerWidget();
-            updateMapVisuals(); // Update marker highlight
+            updateMapVisuals();
         };
     } else if (nextBtn) {
         nextBtn.classList.add('hidden');
     }
 
-    // Render Current Shop
     const shop = nearbyShopsCache[currentShopIndex];
 
-    // CLICK SYNC: Clicking this box -> Zooms Map to Shop
-    // Note: We expose zoomToShop on window for the innerHTML click
     window.zoomToShop = (lat, lng) => {
-        if(deliveryMap) deliveryMap.flyTo([lat, lng], 17, { animate: true, duration: 1 });
+        if(deliveryMap) {
+            deliveryMap.invalidateSize(); // Fix before flying
+            deliveryMap.flyTo([lat, lng], 17, { animate: true, duration: 1 });
+        }
     };
 
     container.innerHTML = `
