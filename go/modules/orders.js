@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Orders Management
+// MODULE: Orders Management (Updated: Auto-Show Shops)
 // ==========================================
 
 import { db } from './firebase-config.js';
@@ -32,15 +32,12 @@ export function listenOrders() {
 
         if (snap.exists()) {
             Object.entries(snap.val()).forEach(([id, o]) => {
-                // 1. Distance Calculation
                 const dist = parseFloat(getDistance(myLat, myLng, o.location.lat, o.location.lng));
 
-                // 2. Filter Logic (Radius & Status)
                 const isInRange = dist <= radius;
                 const isMyOrder = (o.status === 'accepted' && o.deliveryBoyId === window.Ramazone.user.mobile);
                 const isPending = (o.status === 'placed');
 
-                // Sirf tab dikhao agar range mein hai aur pending hai, YA mera apna accepted order hai
                 if ((isPending && isInRange) || isMyOrder) {
                     count++;
                     renderOrderCard(id, o, dist, isMyOrder, list);
@@ -57,12 +54,10 @@ function updateOrderCounts(count) {
     const oc = document.getElementById('orderCount');
     if (oc) oc.innerText = count;
 
-    // Agar koi active order nahi hai, to scanning UI manage karo
     if (!window.Ramazone.activeOrder) {
         if (count > 0) {
             document.getElementById('noOrdersState').classList.add('hidden');
             document.getElementById('ordersContainer').classList.remove('hidden');
-            // Wholesaler Strip bhi update kar sakte hain yahan (future scope)
         } else {
             document.getElementById('noOrdersState').classList.remove('hidden');
             document.getElementById('ordersContainer').classList.add('hidden');
@@ -71,7 +66,7 @@ function updateOrderCounts(count) {
     }
 }
 
-// Helper: Render Single Card (Design Preserved)
+// Helper: Render Single Card
 function renderOrderCard(id, o, dist, isMyOrder, container) {
     const shopName = o.user && o.user.shopName ? o.user.shopName : "Unknown Shop";
     const address = o.location && o.location.address ? o.location.address : "Address Hidden";
@@ -98,19 +93,9 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
 
     let prodTxt = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => `${i.count}x ${i.name}`).join(', ') : 'Items';
 
-    // Logic for Buttons
-    const isActive = window.Ramazone.activeOrder && window.Ramazone.activeOrder.id === id;
-    const btnText = isActive ? 'CONTINUE TASK' : (window.Ramazone.activeOrder ? 'Finish Current' : 'ACCEPT ORDER');
-    const bgClass = isActive ? 'bg-blue-600 hover:bg-blue-500' : (window.Ramazone.activeOrder ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-500');
-
-    // IMPORTANT: Event handling is tricky in modules. We attach ID to button and handle in app.js or here.
-    // Better Approach: Add onclick directly to element but pointing to window wrapper (created below)
-    // OR: Use event listeners in render. Since we are in module, let's use a temporary global wrapper for the button action.
-
-    // Making wrapper for button actions
+    // Global Wrappers for onclick (Module Scope Fix)
     window.tempOrderAction = function(actionId) {
         if(window.Ramazone.activeOrder && window.Ramazone.activeOrder.id === actionId) {
-            // Already active, just reload UI
             loadActiveOrder(actionId, window.Ramazone.activeOrder);
         } else {
             acceptOrder(actionId);
@@ -120,6 +105,10 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
     window.tempMapAction = function(lat, lng) {
         window.open(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`, '_blank');
     };
+
+    const isActive = window.Ramazone.activeOrder && window.Ramazone.activeOrder.id === id;
+    const btnText = isActive ? 'CONTINUE TASK' : (window.Ramazone.activeOrder ? 'Finish Current' : 'ACCEPT ORDER');
+    const bgClass = isActive ? 'bg-blue-600 hover:bg-blue-500' : (window.Ramazone.activeOrder ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-500');
 
     const div = document.createElement('div');
     div.className = `${isMyOrder ? "bg-blue-50 border border-blue-200 shadow-sm" : "glass-card"} p-4 rounded-xl relative mb-4`;
@@ -181,7 +170,7 @@ export function acceptOrder(id) {
     });
 }
 
-// 3. CHECK FOR ACTIVE ORDER (On Load)
+// 3. CHECK FOR ACTIVE ORDER
 export function checkForActiveOrder() {
     const myMobile = window.Ramazone.user.mobile;
     db.ref('orders').orderByChild('deliveryBoyId').equalTo(myMobile).once('value', snap => {
@@ -192,7 +181,6 @@ export function checkForActiveOrder() {
                 const o = orders[key];
                 if(o.status !== 'delivered') {
                     found = true;
-                    // Force Duty ON if active order exists
                     if(!window.Ramazone.isOnline) {
                         toggleDuty(true);
                     }
@@ -201,7 +189,6 @@ export function checkForActiveOrder() {
             });
 
             if(!found) {
-                // Reset UI if no active order
                 document.getElementById('activeOrderPanel').classList.add('hidden');
                 document.getElementById('ordersContainer').classList.remove('hidden');
                 document.getElementById('statsSection').classList.remove('hidden');
@@ -212,7 +199,7 @@ export function checkForActiveOrder() {
     });
 }
 
-// 4. LOAD ACTIVE ORDER UI
+// 4. LOAD ACTIVE ORDER UI (Updated: Auto-Show Shops)
 export async function loadActiveOrder(id, o) {
     window.Ramazone.activeOrder = {id, ...o};
 
@@ -224,23 +211,20 @@ export async function loadActiveOrder(id, o) {
     document.getElementById('activeOrderPanel').classList.remove('hidden');
     document.getElementById('wholesalerStrip').classList.add('hidden');
 
-    // Fill Data
+    // Fill Data (UI Code same as before)
     document.getElementById('actCust').innerText = o.user?.name || "Customer";
     document.getElementById('actAddr').innerText = o.location?.address || "Unknown";
     document.getElementById('actPrefTime').innerText = o.preferences?.deliveryTime || "Standard";
     document.getElementById('actPrefBudget').innerText = o.preferences?.budget || "Standard";
 
-    // Order Time
     if(o.timestamp) {
         document.getElementById('actOrderTime').innerText = new Date(o.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     }
 
-    // Bill Details
     document.getElementById('billItemTotal').innerText = o.payment?.itemTotal || 0;
     document.getElementById('billDeliveryFee').innerText = o.payment?.deliveryFee || 0;
     document.getElementById('billGrandTotal').innerText = o.payment?.grandTotal || 0;
 
-    // Items List
     const ul = document.getElementById('actItems');
     if(ul) {
         ul.innerHTML = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => {
@@ -261,7 +245,6 @@ export async function loadActiveOrder(id, o) {
         `}).join('') : '';
     }
 
-    // Special Requests & Weight
     const weight = calculateOrderWeight(o.cart);
     let specialReqHTML = '';
     if(o.cart) o.cart.forEach(item => {
@@ -287,16 +270,19 @@ export async function loadActiveOrder(id, o) {
 
     updateBtnUI(o.status);
 
-    // ⚡ LAZY LOAD MAP MODULE
-    // Hum map tabhi load karenge jab order active ho.
+    // ⚡⚡ NEW LOGIC: LAZY LOAD MAP & AUTO-SHOW SHOPS ⚡⚡
     const MapModule = await import('./map.js');
-    MapModule.initMap(); // Map container initialize karo
-    MapModule.updateMapVisuals(); // Route draw karo
+    MapModule.initMap(); 
+    MapModule.updateMapVisuals();
 
-    // Wholesaler Widget logic bhi yahan trigger kar sakte ho agar chahiye
+    // 🔥 AUTO-SHOW SHOPS ON MAP (User Requirement)
+    MapModule.setShowShops(true); 
+
+    // 10KM limit wala widget refresh karo
+    MapModule.renderActiveWholesalerWidget();
 }
 
-// 5. UPDATE ORDER STATUS (Button Click)
+// 5. UPDATE ORDER STATUS
 export function updateOrderStatus() {
     if(!window.Ramazone.activeOrder) return;
 
@@ -318,7 +304,6 @@ export function updateOrderStatus() {
     }
 
     if (nextStatus === 'delivered') {
-        // Distance Calculation for Analytics
         if(window.Ramazone.activeOrder.pickupLocation) {
             const pick = window.Ramazone.activeOrder.pickupLocation;
             const dist = getDistance(pick.lat, pick.lng, myLat, myLng);
@@ -332,19 +317,17 @@ export function updateOrderStatus() {
     }
 
     db.ref('orders/' + window.Ramazone.activeOrder.id).update(updates).then(() => {
-        window.Ramazone.activeOrder.status = nextStatus; // Local update
+        window.Ramazone.activeOrder.status = nextStatus; 
 
         if (nextStatus === 'delivered') {
             triggerCelebration();
             showToast("Order Completed! Great Job!");
 
-            // Update Earnings
             const userRef = db.ref('deliveryBoys/' + window.Ramazone.user.mobile);
             userRef.child('earnings').transaction(c => (c || 0) + PARTNER_PAY);
             userRef.child('trips').transaction(c => (c || 0) + 1);
             userRef.child('lifetimeEarnings').transaction(c => (c || 0) + PARTNER_PAY);
 
-            // Clean up UI after 3 seconds
             setTimeout(() => {
                 window.Ramazone.activeOrder = null;
                 document.getElementById('activeOrderPanel').classList.add('hidden');
@@ -359,7 +342,7 @@ export function updateOrderStatus() {
     });
 }
 
-// Helper: Button Styling based on Status
+// Helper: Button Styling
 function updateBtnUI(status) {
     const b = document.getElementById('actionBtn');
     const s = document.getElementById('activeStatus');
