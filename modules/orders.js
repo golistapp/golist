@@ -252,7 +252,14 @@
             const dotClass = isCompleted ? 'timeline-dot active' : 'timeline-dot';
             const textClass = isCompleted ? 'text-slate-800' : 'text-slate-400';
             const connectorClass = (index !== steps.length - 1) ? `<div class="absolute left-[5px] top-[14px] w-0.5 h-full ${isCompleted && !isCurrent ? 'bg-green-500' : 'bg-slate-200'} -z-10"></div>` : '';
-            html += `<div class="relative pl-8 pb-1"><div class="absolute left-0 top-1 ${dotClass}"></div>${connectorClass}<h4 class="text-sm font-bold ${textClass}">${step.label}</h4></div>`;
+
+            // --- NEW: OTP DISPLAY LOGIC ---
+            let otpHtml = '';
+            if (step.key === 'out_for_delivery' && activeTrackingOrder.deliveryOtp) {
+                otpHtml = `<span class="ml-2 text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-mono font-bold tracking-widest border border-red-200">OTP: ${activeTrackingOrder.deliveryOtp}</span>`;
+            }
+
+            html += `<div class="relative pl-8 pb-1"><div class="absolute left-0 top-1 ${dotClass}"></div>${connectorClass}<h4 class="text-sm font-bold ${textClass}">${step.label} ${otpHtml}</h4></div>`;
         });
         timelineContainer.innerHTML = html;
 
