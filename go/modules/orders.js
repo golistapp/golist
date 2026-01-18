@@ -1,5 +1,5 @@
 // ==========================================
-// MODULE: Orders Management (Updated: Hide/Show Items + Delivery Time Label)
+// MODULE: Orders Management (Updated: OTP Security Added)
 // ==========================================
 
 import { db } from './firebase-config.js';
@@ -92,7 +92,6 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
 
     let prodTxt = o.cart ? o.cart.filter(i=>i.qty!=='Special Request').map(i => `${i.count}x ${i.name}`).join(', ') : 'Items';
 
-    // Global Wrappers
     window.tempOrderAction = function(actionId) {
         if(window.Ramazone.activeOrder && window.Ramazone.activeOrder.id === actionId) {
             loadActiveOrder(actionId, window.Ramazone.activeOrder);
@@ -112,7 +111,6 @@ function renderOrderCard(id, o, dist, isMyOrder, container) {
     const div = document.createElement('div');
     div.className = `${isMyOrder ? "bg-blue-50 border border-blue-200 shadow-sm" : "glass-card"} p-4 rounded-xl relative mb-4`;
 
-    // Update: 'Pref. Time' changed to 'Delivery Time'
     div.innerHTML = `
         <div class="flex justify-between items-start mb-2">
             <h4 class="font-bold text-gray-900 text-lg">${shopName}</h4>
@@ -199,7 +197,7 @@ export function checkForActiveOrder() {
     });
 }
 
-// 4. LOAD ACTIVE ORDER UI (Features: Hide Toggle + Delivery Time)
+// 4. LOAD ACTIVE ORDER UI
 export async function loadActiveOrder(id, o) {
     window.Ramazone.activeOrder = {id, ...o};
 
@@ -220,7 +218,7 @@ export async function loadActiveOrder(id, o) {
     // UI Label Update: Pref Time -> Delivery Time
     const prefTimeContainer = document.getElementById('actPrefTime').parentElement;
     if(prefTimeContainer) {
-        const label = prefTimeContainer.querySelector('p:first-child'); // The "PREF. TIME" label
+        const label = prefTimeContainer.querySelector('p:first-child'); 
         if(label) label.innerText = "DELIVERY TIME";
     }
 
@@ -247,12 +245,9 @@ export async function loadActiveOrder(id, o) {
 
     const ul = document.getElementById('actItems');
     if(ul) {
-        // Find wrapper to inject header with button
-        // Logic: Replace simple "H4" with a click-able Div
         let container = ul.parentElement;
         let header = container.querySelector('h4');
 
-        // Safety check: Don't duplicate if already exists
         if(header && !header.parentElement.classList.contains('cursor-pointer')) {
             const newHeader = document.createElement('div');
             newHeader.className = "flex justify-between items-center border-b border-gray-100 pb-2 mb-2 cursor-pointer";
@@ -307,8 +302,7 @@ export async function loadActiveOrder(id, o) {
 
     updateBtnUI(o.status);
 
-    // ⚡⚡ LAZY LOAD MAP & AUTO-SHOW SHOPS ⚡⚡
-    // Ensuring map loads fast with new features
+    // Load Map & Shops
     const MapModule = await import('./map.js');
     MapModule.initMap(); 
     MapModule.updateMapVisuals(); 
@@ -316,7 +310,7 @@ export async function loadActiveOrder(id, o) {
     MapModule.renderActiveWholesalerWidget();
 }
 
-// 5. UPDATE ORDER STATUS
+// 5. UPDATE ORDER STATUS (Modified for OTP)
 export function updateOrderStatus() {
     if(!window.Ramazone.activeOrder) return;
 
@@ -327,52 +321,100 @@ export function updateOrderStatus() {
     else if(currentStatus === 'out_for_delivery') nextStatus = 'delivered';
     else return;
 
-    if(nextStatus === 'delivered' && !confirm("Confirm Cash Collected & Parcel Given?")) return;
+    // --- NEW SECURITY CHECK ---
+    // If trying to deliver, OPEN MODAL FIRST (Don't complete yet)
+    if(nextStatus === 'delivered') {
+        const modal = document.getElementById('otpModal');
+        const input = document.getElementById('otpInput');
+        if(modal) {
+            if(input) input.value = ''; // Clear old input
+            modal.classList.remove('hidden');
+        }
+        return; // STOP EXECUTION HERE
+    }
 
+    // --- NORMAL UPDATE (PICKUP) ---
     const updates = { status: nextStatus };
     const myLat = window.Ramazone.location.lat;
     const myLng = window.Ramazone.location.lng;
 
     if (nextStatus === 'out_for_delivery') {
         updates.pickupLocation = { lat: myLat, lng: myLng };
-    }
 
-    if (nextStatus === 'delivered') {
-        if(window.Ramazone.activeOrder.pickupLocation) {
-            const pick = window.Ramazone.activeOrder.pickupLocation;
-            const dist = getDistance(pick.lat, pick.lng, myLat, myLng);
-            if(dist && !isNaN(dist)) {
-                db.ref('deliveryBoys/' + window.Ramazone.user.mobile + '/totalDistance').transaction(d => (d || 0) + parseFloat(dist));
-            }
-        }
+        // GENERATE & SAVE 4-DIGIT OTP
+        const otp = Math.floor(1000 + Math.random() * 9000);
+        updates.deliveryOtp = otp;
 
-        updates.completedAt = firebase.database.ServerValue.TIMESTAMP;
-        updates.partnerPay = PARTNER_PAY;
+        // Update local object immediately so we have it
+        window.Ramazone.activeOrder.deliveryOtp = otp;
     }
 
     db.ref('orders/' + window.Ramazone.activeOrder.id).update(updates).then(() => {
         window.Ramazone.activeOrder.status = nextStatus; 
+        updateBtnUI(nextStatus);
+        showToast("Status Updated!");
+    });
+}
 
-        if (nextStatus === 'delivered') {
-            triggerCelebration();
-            showToast("Order Completed! Great Job!");
+// 6. VERIFY OTP & COMPLETE ORDER (New Function)
+export function verifyAndCompleteOrder(inputOtp) {
+    const order = window.Ramazone.activeOrder;
+    if(!order) return;
 
-            const userRef = db.ref('deliveryBoys/' + window.Ramazone.user.mobile);
-            userRef.child('earnings').transaction(c => (c || 0) + PARTNER_PAY);
-            userRef.child('trips').transaction(c => (c || 0) + 1);
-            userRef.child('lifetimeEarnings').transaction(c => (c || 0) + PARTNER_PAY);
+    // 1. Verify OTP
+    // (Check against local object or fetch if missing)
+    if(!order.deliveryOtp) {
+        showToast("Error: No OTP found on order.");
+        return;
+    }
 
-            setTimeout(() => {
-                window.Ramazone.activeOrder = null;
-                document.getElementById('activeOrderPanel').classList.add('hidden');
-                document.getElementById('statsSection').classList.remove('hidden');
-                document.getElementById('radiusControl').classList.remove('hidden');
-                document.getElementById('ordersContainer').classList.remove('hidden');
-                listenOrders();
-            }, 3000);
-        } else {
-            updateBtnUI(nextStatus);
+    if(String(inputOtp).trim() !== String(order.deliveryOtp)) {
+        showToast("❌ Incorrect OTP! Ask Customer.");
+        return;
+    }
+
+    // 2. If Correct, Proceed with Delivery Logic
+    const myLat = window.Ramazone.location.lat;
+    const myLng = window.Ramazone.location.lng;
+
+    // Calculate Distance for Stats
+    if(order.pickupLocation) {
+        const pick = order.pickupLocation;
+        const dist = getDistance(pick.lat, pick.lng, myLat, myLng);
+        if(dist && !isNaN(dist)) {
+            db.ref('deliveryBoys/' + window.Ramazone.user.mobile + '/totalDistance').transaction(d => (d || 0) + parseFloat(dist));
         }
+    }
+
+    const updates = { 
+        status: 'delivered',
+        completedAt: firebase.database.ServerValue.TIMESTAMP,
+        partnerPay: PARTNER_PAY
+    };
+
+    db.ref('orders/' + order.id).update(updates).then(() => {
+        // UI Updates
+        document.getElementById('otpModal').classList.add('hidden');
+        window.Ramazone.activeOrder.status = 'delivered';
+
+        triggerCelebration();
+        showToast("✅ Verified! Order Completed!");
+
+        // Earnings Update
+        const userRef = db.ref('deliveryBoys/' + window.Ramazone.user.mobile);
+        userRef.child('earnings').transaction(c => (c || 0) + PARTNER_PAY);
+        userRef.child('trips').transaction(c => (c || 0) + 1);
+        userRef.child('lifetimeEarnings').transaction(c => (c || 0) + PARTNER_PAY);
+
+        // Reset Dashboard
+        setTimeout(() => {
+            window.Ramazone.activeOrder = null;
+            document.getElementById('activeOrderPanel').classList.add('hidden');
+            document.getElementById('statsSection').classList.remove('hidden');
+            document.getElementById('radiusControl').classList.remove('hidden');
+            document.getElementById('ordersContainer').classList.remove('hidden');
+            listenOrders();
+        }, 3000);
     });
 }
 

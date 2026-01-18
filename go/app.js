@@ -1,5 +1,5 @@
 // ==========================================
-// FILE: app.js (Final Version with Settings)
+// FILE: app.js (Final Version with OTP Support)
 // ==========================================
 
 console.log("🚀 Initializing Ramazone Partner App...");
@@ -10,7 +10,7 @@ import * as Duty from './modules/duty.js';
 import * as Orders from './modules/orders.js';
 import * as Wholesaler from './modules/wholesaler.js';
 import * as MapModule from './modules/map.js'; 
-import * as Settings from './modules/settings.js'; // NEW: Settings Module Import
+import * as Settings from './modules/settings.js';
 
 // GLOBAL STATE
 window.Ramazone = {
@@ -42,7 +42,7 @@ document.addEventListener('click', async (e) => {
         }
     }
 
-    // --- NEW: SETTINGS (PIN & VEHICLE) ---
+    // --- SETTINGS (PIN & VEHICLE) ---
     if (target.closest('#navChangePin')) Settings.openPinModal();
     if (target.closest('#navVehicle')) Settings.openVehicleModal();
     if (target.closest('#btnSavePin')) Settings.saveNewPin();
@@ -69,10 +69,16 @@ document.addEventListener('click', async (e) => {
     if (target.closest('#btnConnectLoc')) Wholesaler.connectLocation();
     if (target.closest('#btnWsSubmit')) Wholesaler.submitRequest();
 
-    // --- ORDER ACTIONS ---
+    // --- ORDER ACTIONS (Buttons) ---
     if (target.id === 'actionBtn') Orders.updateOrderStatus();
 
-    // Active Order Buttons
+    // NEW: Verify OTP Button Click
+    if (target.closest('#btnVerifyOtp')) {
+        const input = document.getElementById('otpInput');
+        if(input) Orders.verifyAndCompleteOrder(input.value);
+    }
+
+    // Active Order Actions (Call/Map)
     if(window.Ramazone.activeOrder) {
         if (target.closest('#btnNavDir')) {
             UI.openExternalMap(window.Ramazone.activeOrder.location.lat, window.Ramazone.activeOrder.location.lng);
@@ -152,7 +158,6 @@ async function initApp() {
 
     } catch (error) {
         console.error("CRITICAL ERROR IN INIT:", error);
-        // alert("App Error: " + error.message + ". Please refresh.");
     }
 }
 
